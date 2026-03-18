@@ -1,26 +1,166 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: 223 18% 4%;
+  --panel: 223 18% 4%;
+  --panel-2: 220 20% 8%;
+  --border: 217 15% 26%;
+  --text: 210 18% 91%;
+  --muted: 215 14% 62%;
+  --accent-hex: #ac1b2a;
+  --danger: 0 84% 60%;
+  --success: 142 70% 45%;
+  --warning: 38 92% 55%;
+  --glow: 0 0 18px rgba(242, 91, 105, 0.16);
+  --radius: 6px;
+  --radius-button-tag: 8px;
+  --radius-surface: 6px;
+  --subtitle-sm: 1.0625rem;
+  --subtitle-sm-line-height: 1.55;
+  --tracking-tightish: 0.02em;
+  --tracking-widerish: 0.08em;
+  --text-title-lg: 2.5rem;
+  --text-title-lg-line-height: 1.1;
+  --text-title: 2.20rem;
+  --text-title-line-height: 1.1;
+  --text-heading: 1.8rem;
+  --text-heading-line-height: 1.2;
+  --text-subheading: 1.25rem;
+  --text-subheading-line-height: 1.3;
+  --text-lg: 1.125rem;
+  --text-lg-line-height: 1.45;
+  --text-base: 1rem;
+  --text-base-line-height: 1.45;
+  --text-sm: 0.875rem;
+  --text-sm-line-height: 1.4;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background:
+    radial-gradient(circle at top, rgba(65, 95, 130, 0.14), transparent 32%),
+    linear-gradient(to bottom, #090b10, #07090d);
+  color: hsl(var(--text));
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: 0.02em;
+}
+
+::selection {
+  background: rgba(242, 91, 105, 0.2);
+}
+
+@layer utilities {
+  .bg-bg {
+    background-color: hsl(var(--bg));
+  }
+
+  .bg-panel {
+    background-color: hsl(var(--panel));
+  }
+
+  .bg-panel-2 {
+    background-color: hsl(var(--panel-2));
+  }
+
+  .border-border {
+    border-color: hsl(var(--border));
+  }
+
+  .text-fg {
+    color: hsl(var(--text));
+  }
+
+  .text-muted {
+    color: hsl(var(--muted));
+  }
+
+  .text-accent {
+    color: var(--accent-hex);
+  }
+
+  .text-subtitle-sm {
+    font-size: var(--subtitle-sm);
+    line-height: var(--subtitle-sm-line-height);
+  }
+
+  .text-title {
+    font-size: var(--text-title);
+    line-height: var(--text-title-line-height);
+  }
+
+  .text-title-lg {
+    font-size: var(--text-title-lg);
+    line-height: var(--text-title-lg-line-height);
+  }
+
+  .text-heading {
+    font-size: var(--text-heading);
+    line-height: var(--text-heading-line-height);
+  }
+
+  .text-subheading {
+    font-size: var(--text-subheading);
+    line-height: var(--text-subheading-line-height);
+  }
+
+  .text-body-lg {
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-line-height);
+  }
+
+  .text-body {
+    font-size: var(--text-base);
+    line-height: var(--text-base-line-height);
+  }
+
+  .text-body-sm {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-line-height);
+  }
+
+  .rounded-base {
+    border-radius: var(--radius);
+  }
+
+  .rounded-button-tag {
+    border-radius: var(--radius-button-tag);
+  }
+
+  .rounded-surface {
+    border-radius: var(--radius-surface);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--glow);
+  }
+
+  .tracking-tightish {
+    letter-spacing: 0.02em;
+  }
+
+  .tracking-widerish {
+    letter-spacing: 0.08em;
+  }
 }
