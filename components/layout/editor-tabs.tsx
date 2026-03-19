@@ -1,3 +1,5 @@
+"use client";
+
 import { SectionNav } from "@/components/ui/section-nav";
 import type { EditorTab } from "@/types/event";
 

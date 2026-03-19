@@ -1,6 +1,7 @@
-import { ReactNode } from "react";
+import { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils/index";
 
 type OfficeShellProps = {
   children: ReactNode;
@@ -9,6 +10,10 @@ type OfficeShellProps = {
   description?: string;
   tabs?: ReactNode;
   headerActions?: ReactNode;
+  titleClassName?: string;
+  titleStyle?: CSSProperties;
+  descriptionClassName?: string;
+  descriptionStyle?: CSSProperties;
 };
 
 export function OfficeShell({
@@ -18,6 +23,10 @@ export function OfficeShell({
   description,
   tabs,
   headerActions,
+  titleClassName,
+  titleStyle,
+  descriptionClassName,
+  descriptionStyle,
 }: OfficeShellProps) {
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -31,7 +40,7 @@ export function OfficeShell({
             >
               OFFICE
             </Link>
-            <div className="min-w-0 text-body text-muted">
+            <div className="min-w-0 text-body text-[#FFFFFF]">
               Nightlife Ops System
             </div>
           </div>
@@ -58,20 +67,34 @@ export function OfficeShell({
         </div>
       </header>
 
-      <main className="px-4 py-6 md:px-6">
+      <main className="px-4 py-4 md:px-6">
         <div className="mx-auto max-w-7xl space-y-6">
-          <header className="space-y-4">
+          <header className="space-y-2">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-2">
-                <p className="text-body-sm uppercase tracking-widerish text-muted">
-                  {eyebrow}
-                </p>
+              <div className="space-y-1.5">
+                {eyebrow ? (
+                  <p className="text-body-sm uppercase tracking-widerish text-muted">
+                    {eyebrow}
+                  </p>
+                ) : null}
                 <div className="space-y-1">
-                  <h1 className="text-title font-semibold tracking-tightish">
+                  <h1
+                    className={cn(
+                      "text-title font-semibold tracking-tightish",
+                      titleClassName,
+                    )}
+                    style={titleStyle}
+                  >
                     {title}
                   </h1>
                   {description ? (
-                    <p className="max-w-3xl text-body text-muted">
+                    <p
+                      className={cn(
+                        "max-w-3xl text-body text-muted",
+                        descriptionClassName,
+                      )}
+                      style={descriptionStyle}
+                    >
                       {description}
                     </p>
                   ) : null}

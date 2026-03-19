@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils/index";
 
 type SectionNavProps = {
@@ -15,7 +17,7 @@ export function SectionNav({
 }: SectionNavProps) {
   return (
     <nav aria-label="Section navigation" className={className}>
-      <ul className="flex flex-wrap items-end gap-6">
+      <ul className="flex flex-wrap items-end gap-8">
         {items.map((item) => {
           const isActive = item === activeItem;
 
@@ -26,7 +28,7 @@ export function SectionNav({
                 onClick={() => onChange?.(item)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "relative border-0 bg-transparent px-0 pb-1 text-body uppercase tracking-widerish transition outline-none",
+                  "relative border-0 bg-transparent px-0 pb-1 text-subheading uppercase tracking-widerish transition outline-none",
                   isActive ? "text-fg" : "text-muted hover:text-fg",
                 )}
               >

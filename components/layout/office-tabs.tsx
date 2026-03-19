@@ -1,3 +1,5 @@
+"use client";
+
 import { SectionNav } from "@/components/ui/section-nav";
 import type { EventStatus } from "@/types/event";
 
@@ -16,7 +18,7 @@ type OfficeTabsProps = {
   className?: string;
 };
 
-const officeTabs: OfficeTab[] = ["upcoming", "live", "draft", "past"];
+const officeTabs: OfficeTab[] = ["live", "upcoming", "draft", "past"];
 
 export function OfficeTabs({
   activeTab,
