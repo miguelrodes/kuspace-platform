@@ -1,5 +1,7 @@
 "use client";
 
+import { DropdownSelect } from "@/components/ui/dropdown-select";
+
 type CalendarHeaderProps = {
   month: number;
   year: number;
@@ -30,38 +32,39 @@ export function CalendarHeader({
   onMonthChange,
   onYearChange,
 }: CalendarHeaderProps) {
+  const monthOptions = monthLabels.map((label, index) => ({
+    value: String(index),
+    label,
+  }));
+  const yearOptions = availableYears.map((option) => ({
+    value: String(option),
+    label: String(option),
+  }));
+
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
       <label className="inline-flex items-center gap-2 text-body-sm uppercase tracking-widerish text-muted">
         <span className="sr-only">Month</span>
-        <select
+        <DropdownSelect
           aria-label="Month"
-          value={month}
-          onChange={(event) => onMonthChange(Number(event.target.value))}
-          className="h-8 rounded-[var(--radius-surface)] border border-border bg-panel-2 px-3 text-body text-fg outline-none transition focus:border-[var(--accent-hex)]"
-        >
-          {monthLabels.map((label, index) => (
-            <option key={label} value={index}>
-              {label}
-            </option>
-          ))}
-        </select>
+          value={String(month)}
+          options={monthOptions}
+          onChange={(value) => onMonthChange(Number(value))}
+          className="h-8 rounded-[var(--radius-surface)] border border-border bg-panel px-3 text-body text-fg outline-none transition focus:border-[var(--accent-hex)]"
+          optionClassName="text-body"
+        />
       </label>
 
       <label className="inline-flex items-center gap-2 text-body-sm uppercase tracking-widerish text-muted">
         <span className="sr-only">Year</span>
-        <select
+        <DropdownSelect
           aria-label="Year"
-          value={year}
-          onChange={(event) => onYearChange(Number(event.target.value))}
-          className="h-8 rounded-[var(--radius-surface)] border border-border bg-panel-2 px-3 text-body text-fg outline-none transition focus:border-[var(--accent-hex)]"
-        >
-          {availableYears.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          value={String(year)}
+          options={yearOptions}
+          onChange={(value) => onYearChange(Number(value))}
+          className="h-8 rounded-[var(--radius-surface)] border border-border bg-panel px-3 text-body text-fg outline-none transition focus:border-[var(--accent-hex)]"
+          optionClassName="text-body"
+        />
       </label>
     </div>
   );

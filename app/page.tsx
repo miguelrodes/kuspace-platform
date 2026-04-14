@@ -1,8 +1,12 @@
+"use client";
+
 import { HomeFeed } from "@/components/home/home-feed";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
-import { mockEvents, mockRecruiterProfile } from "@/lib/mock-data";
+import { useMockEventsStore } from "@/lib/mock-store";
 
 export default function HomePage() {
+  const { events, profile } = useMockEventsStore();
+
   return (
     <div className="min-h-screen bg-bg text-fg">
       <PublicTopNav
@@ -10,18 +14,26 @@ export default function HomePage() {
         subtitle="Clubs, Brands, Collectives"
       />
 
-      <main className="px-4 py-8 md:px-6">
-        <div className="mx-auto max-w-6xl space-y-4">
+      <main className="px-4 py-6 md:px-6">
+        <div className="mx-auto max-w-6xl space-y-2">
           <header className="space-y-1">
             <h1
-              className="text-heading uppercase tracking-[0.2em]"
-              style={{ color: "var(--accent-hex)" }}
+              className="text-heading uppercase"
+              style={{
+                color: "var(--accent-hex)",
+                fontFamily: "var(--font-space-grotesk)",
+                letterSpacing: "0.06em",
+              }}
             >
               Events
             </h1>
           </header>
 
-          <HomeFeed events={mockEvents} recruiter={mockRecruiterProfile} />
+          <HomeFeed
+            events={events}
+            recruiter={profile}
+            audience="consumer"
+          />
         </div>
       </main>
     </div>

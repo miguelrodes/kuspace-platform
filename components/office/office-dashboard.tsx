@@ -39,7 +39,7 @@ export function OfficeDashboard() {
   }, [activeTab, events]);
 
   return (
-    <div className="-mt-4 border-l border-border pl-4 pr-4 md:pl-5 md:pr-5">
+    <div className="-mt-4 border-x border-border pl-4 pr-4 md:pl-5 md:pr-5">
       <div className="space-y-6">
         <OfficeCalendar events={events} closeSignal={activeTab} />
         <div className="pt-2">

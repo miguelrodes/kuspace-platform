@@ -20,7 +20,6 @@ type OfficeEventListProps = {
 export function OfficeEventList({
   activeTab,
   events,
-  recruiter,
   onTabChange,
 }: OfficeEventListProps) {
   return (
@@ -28,8 +27,12 @@ export function OfficeEventList({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <OfficeEventTabs activeTab={activeTab} onChange={onTabChange} />
 
-        <Link href="/office/events/new">
-          <Button className="h-8 px-4 text-body-sm uppercase tracking-[0.14em]">
+        <Link href="/office/event-editor/new">
+          <Button
+            variant="ghost"
+            className="h-8 px-4 text-heading uppercase tracking-[0.14em]"
+            style={{ color: "var(--accent-hex)" }}
+          >
             NEW EVENT
           </Button>
         </Link>
@@ -43,7 +46,6 @@ export function OfficeEventList({
             <OfficeEventRow
               key={event.id}
               event={event}
-              recruiter={recruiter}
             />
           ))}
         </div>

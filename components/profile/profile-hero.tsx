@@ -16,7 +16,7 @@ export function ProfileHero({ profile }: ProfileHeroProps) {
 
       <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-5">
         <div className="-mt-1 flex items-start gap-4 md:-mt-2">
-          <div className="h-36 w-36 overflow-hidden rounded-full border border-white/15 bg-panel-2 md:h-40 md:w-40">
+          <div className="h-36 w-36 overflow-hidden rounded-full border border-white/15 bg-panel md:h-40 md:w-40">
             <div
               className="h-full w-full bg-cover bg-center"
               style={{

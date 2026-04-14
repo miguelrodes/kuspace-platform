@@ -1,4 +1,5 @@
 export type EventStatus = "draft" | "upcoming" | "live" | "past" | "cancelled";
+export type AdmissionMode = "public" | "curated";
 
 // Recruiter event editor tab state.
 export type EditorTab =
@@ -15,11 +16,23 @@ export type EventTimeRange = {
 };
 
 export type EventType = "room" | "terrace" | "festival" | "warehouse";
+export type EventDisplayMode = "event" | "room";
+
+export type ArtistProfile = {
+  id: string;
+  name: string;
+  contact?: string;
+  notes?: string;
+  instagram?: string;
+  residentAdvisor?: string;
+  website?: string;
+};
 
 export type EventCoverSection = {
   title: string;
   description?: string;
   shortDescription?: string;
+  genreDisplayMode?: EventDisplayMode;
   date: string;
   time?: EventTimeRange;
   imageUrl: string;
@@ -31,6 +44,12 @@ export type EventCoverSection = {
   type: EventType;
   roomSize: number;
   numberOfRooms?: number;
+  rooms?: Array<{
+    id: string;
+    name: string;
+    capacity: number;
+    genres?: string[];
+  }>;
 };
 
 export type LineupEntryKind =
@@ -41,11 +60,15 @@ export type LineupEntryKind =
 
 export type LineupEntry = {
   id: string;
+  artistId: string;
   name: string;
   kind?: LineupEntryKind;
+  roomId?: string;
+  roomIds?: string[];
 };
 
 export type EventLineupSection = {
+  displayMode?: EventDisplayMode;
   entries: LineupEntry[];
 };
 
@@ -66,9 +89,40 @@ export type EventTimetableSection = {
   rows: TimetableRow[];
 };
 
-export type GuestlistGroup = {
+export type AccessGroup = {
   id: string;
   name: string;
+};
+
+export type EventAccessAssignmentSource = "purchase" | "manual" | "approval";
+export type EventAccessPaymentState =
+  | "not_required"
+  | "pending"
+  | "paid"
+  | "waived";
+export type EventApplicationStatus = "pending" | "accepted" | "denied";
+
+export type EventAccessAssignment = {
+  eventId: string;
+  userId: string;
+  accessGroupId: string;
+  source: EventAccessAssignmentSource;
+  paymentState: EventAccessPaymentState;
+  checkedIn: boolean;
+  assignedAt?: string;
+  assignedBy?: string;
+  notes?: string;
+};
+
+export type EventApplication = {
+  eventId: string;
+  userId: string;
+  status: EventApplicationStatus;
+  appliedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  accessGroupId?: string;
+  notes?: string;
 };
 
 export type GuestlistEntrySource = "user" | "manual";
@@ -77,16 +131,21 @@ export type GuestlistEntry =
   | {
       id: string;
       source: "user";
-      groupId: string;
+      accessGroupId: string;
       userId: string;
       checkedIn: boolean;
+      createdAt?: string;
     }
   | {
       id: string;
       source: "manual";
-      groupId: string;
-      name: string;
+      accessGroupId: string;
+      firstName: string;
+      lastName: string;
+      userId?: string;
       checkedIn: boolean;
+      createdAt?: string;
+      notes?: string;
     };
 
 export type EventGuestlistSummary = {
@@ -96,7 +155,7 @@ export type EventGuestlistSummary = {
 };
 
 export type EventGuestlistSection = {
-  groups: GuestlistGroup[];
+  accessGroups: AccessGroup[];
   entries: GuestlistEntry[];
   summary?: EventGuestlistSummary;
 };
@@ -117,8 +176,10 @@ export type EventBudgetSection = {
 };
 
 export type TicketTierVisibility = "public" | "hidden";
+export type TicketSectionVisibility = "public" | "hidden" | "restricted";
 
 export type TicketTierStatus = "live" | "upcoming" | "sold_out";
+export type TicketReleaseMode = "manual" | "scheduled" | "after_previous_sold_out";
 
 export type TicketTier = {
   id: string;
@@ -132,14 +193,38 @@ export type TicketTier = {
   releaseAfterTierId?: string;
 };
 
+export type TicketSection = {
+  id: string;
+  name: string;
+  visibility: TicketSectionVisibility;
+  accessGroupId: string;
+  allowedGroupIds: string[];
+  phases: Array<
+    TicketTier & {
+      salesStart?: string;
+      salesEnd?: string;
+      releaseMode?: TicketReleaseMode;
+    }
+  >;
+};
+
 export type EventTicketsSection = {
   tiers: TicketTier[];
+  sections?: TicketSection[];
+};
+
+export type EventPromoter = {
+  id: string;
+  name: string;
+  profileSlug?: string;
+  avatarImageUrl?: string;
 };
 
 export interface Event {
   id: string;
   slug: string;
   status: EventStatus;
+  admissionMode: AdmissionMode;
   createdAt: string;
   updatedAt: string;
   recruiterProfileId: string;
@@ -148,8 +233,11 @@ export interface Event {
   lineup: EventLineupSection;
   timetable: EventTimetableSection;
   guestlist: EventGuestlistSection;
+  accessAssignments: EventAccessAssignment[];
+  applications: EventApplication[];
   budget: EventBudgetSection;
   tickets: EventTicketsSection;
+  promoters?: EventPromoter[];
 }
 
 export type EventSummaryCover = Pick<

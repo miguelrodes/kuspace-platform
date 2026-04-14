@@ -10,7 +10,7 @@ export function EventPoster({
   aspectClassName = "aspect-[16/9]",
 }: EventPosterProps) {
   return (
-    <div className="relative overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel-2">
+    <div className="relative overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel">
       <div
         role="img"
         aria-label={imageAlt}

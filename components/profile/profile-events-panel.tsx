@@ -1,90 +1,24 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import type { Event } from "@/types/event";
 import type { RecruiterProfile } from "@/types/profile";
-import { EventPoster } from "@/components/home/event-poster";
-import { EventMetaRow } from "@/components/home/event-meta-row";
-import { formatCompactEventDate } from "@/lib/utils/date";
+import { ProfileEventCard } from "@/components/profile/profile-event-card";
 
 type ProfileEventsPanelProps = {
   profile: RecruiterProfile;
   upcomingEvents: Event[];
   pastEvents: Event[];
+  audience?: "consumer" | "recruiter";
 };
 
 type EventPanelTab = "upcoming" | "past";
-
-function CompactEventCard({
-  event,
-  recruiter,
-}: {
-  event: Event;
-  recruiter: RecruiterProfile;
-}) {
-  const lineupPreview = event.lineup.entries.map((entry) => entry.name).join(", ");
-
-  return (
-    <div className="group relative h-full min-h-[20rem] overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel-2 px-3 py-3 transition hover:border-white/20">
-      <Link
-        href={`/events/${event.slug}`}
-        aria-label={`View ${event.cover.title}`}
-        className="absolute inset-0 z-0"
-      />
-
-      <div className="relative z-10 flex h-full flex-col gap-3">
-        <EventPoster
-          imageUrl={event.cover.imageUrl}
-          imageAlt={event.cover.imageAlt}
-          aspectClassName="aspect-[2/1]"
-        />
-
-        <div className="flex flex-1 flex-col space-y-2">
-          <p className="text-body-sm uppercase tracking-widerish text-muted">
-            {formatCompactEventDate(event.cover.date)}
-          </p>
-
-          <div className="flex min-h-0 flex-1 flex-col">
-            <h3
-              className="min-h-[3.2rem] overflow-hidden text-body-lg font-medium text-fg"
-              style={{
-                display: "-webkit-box",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2,
-              }}
-            >
-              {event.cover.title}
-            </h3>
-            <p
-              className="mt-1 min-h-[2.6rem] overflow-hidden text-body-sm text-muted"
-              style={{
-                display: "-webkit-box",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2,
-              }}
-            >
-              {lineupPreview}
-            </p>
-          </div>
-
-          <div className="mt-auto pt-2">
-            <EventMetaRow
-              location={event.cover.location}
-              recruiterName={recruiter.displayName}
-              recruiterSlug={recruiter.slug}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function ProfileEventsPanel({
   profile,
   upcomingEvents,
   pastEvents,
+  audience = "recruiter",
 }: ProfileEventsPanelProps) {
   const [tab, setTab] = useState<EventPanelTab>("upcoming");
 
@@ -94,29 +28,39 @@ export function ProfileEventsPanel({
   );
 
   return (
-    <div className="space-y-4 px-4 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-2.5 px-4 py-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <h2
-          className="text-heading uppercase tracking-tightish"
-          style={{ color: "var(--accent-hex)" }}
+          className="relative top-[3px] text-heading uppercase leading-none"
+          style={{
+            color: "var(--accent-hex)",
+            fontFamily: "var(--font-space-grotesk)",
+            letterSpacing: "0.06em",
+          }}
         >
           Events
         </h2>
-        <div className="inline-flex overflow-hidden rounded-[var(--radius-button-tag)] border border-white/10">
-          {(["upcoming", "past"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setTab(item)}
-              className={[
-                "min-w-[7.5rem] px-3 py-1 text-center text-body-sm uppercase tracking-widerish transition",
-                tab === item
-                  ? "bg-[var(--accent-hex)] text-white"
-                  : "bg-transparent text-muted hover:text-fg",
-              ].join(" ")}
-            >
-              {item}
-            </button>
+        <div className="inline-flex items-end gap-2 self-end">
+          {(["upcoming", "past"] as const).map((item, index) => (
+            <div key={item} className="inline-flex items-end gap-2">
+              {index > 0 ? (
+                <span className="relative top-[-2px] block text-lg uppercase tracking-widerish leading-none text-white">
+                  |
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setTab(item)}
+                className={[
+                  "inline-flex items-end rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-lg uppercase tracking-widerish leading-none transition",
+                  tab === item
+                    ? "bg-transparent text-white"
+                    : "text-muted hover:text-fg",
+                ].join(" ")}
+              >
+                {item}
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -124,14 +68,17 @@ export function ProfileEventsPanel({
       {visibleEvents.length === 0 ? (
         <p className="text-body-sm text-muted">No events in this section.</p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visibleEvents.map((event) => (
-            <CompactEventCard
-              key={event.id}
-              event={event}
-              recruiter={profile}
-            />
-          ))}
+        <div className="max-h-[32rem] overflow-y-auto pr-1">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {visibleEvents.map((event) => (
+              <ProfileEventCard
+                key={event.id}
+                event={event}
+                recruiter={profile}
+                audience={audience}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -1,0 +1,647 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
+import type { TicketSectionDraft } from "@/components/editor/ticket-tier-card";
+
+type TicketSummaryPanelProps = {
+  sections: TicketSectionDraft[];
+};
+
+type TimeWindow = "full" | "24h";
+
+type ChartPoint = {
+  label: string;
+  timestamp: number;
+  value: number;
+};
+
+const PROTOTYPE_NOW = new Date("2016-09-15T09:00:00.000Z");
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+function parseNumber(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatTicketsPerHour(value: number) {
+  return `${value.toFixed(1)} T/h`;
+}
+
+function formatAxisLabel(timestamp: number) {
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(timestamp));
+}
+
+function formatHourlyAxisLabel(timestamp: number) {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(timestamp));
+}
+
+function computeTicketsPerHour(sold: number, salesStart?: string, salesEnd?: string) {
+  if (sold <= 0 || !salesStart) {
+    return 0;
+  }
+
+  const start = new Date(salesStart);
+  const end = salesEnd ? new Date(salesEnd) : PROTOTYPE_NOW;
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return 0;
+  }
+
+  const hours = Math.max((end.getTime() - start.getTime()) / (1000 * 60 * 60), 1);
+  return Number((sold / hours).toFixed(1));
+}
+
+function buildLinePath(points: number[], width: number, height: number) {
+  if (points.length === 0) return "";
+
+  const max = Math.max(...points, 1);
+  const stepX = points.length === 1 ? 0 : width / (points.length - 1);
+
+  return points
+    .map((point, index) => {
+      const x = index * stepX;
+      const y = height - (point / max) * height;
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+}
+
+function getAnchorTimestamp(sections: TicketSectionDraft[]) {
+  const hasLivePhase = sections.some((section) =>
+    section.phases.some((phase) => phase.status === "live"),
+  );
+
+  if (hasLivePhase) {
+    return PROTOTYPE_NOW.getTime();
+  }
+
+  const timestamps = sections.flatMap((section) =>
+    section.phases.flatMap((phase) => {
+      const values: number[] = [];
+      if (phase.salesStart) values.push(new Date(phase.salesStart).getTime());
+      if (phase.salesEnd) values.push(new Date(phase.salesEnd).getTime());
+      return values;
+    }),
+  );
+
+  const latestTimestamp = timestamps
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => b - a)[0];
+
+  return latestTimestamp ?? PROTOTYPE_NOW.getTime();
+}
+
+function soldByTime(sold: number, salesStart?: string, salesEnd?: string, timestamp?: number) {
+  if (!sold || !salesStart || !timestamp) {
+    return 0;
+  }
+
+  const start = new Date(salesStart).getTime();
+  const end = salesEnd ? new Date(salesEnd).getTime() : PROTOTYPE_NOW.getTime();
+
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
+    return 0;
+  }
+
+  if (timestamp <= start) {
+    return 0;
+  }
+
+  if (timestamp >= end) {
+    return sold;
+  }
+
+  const progress = (timestamp - start) / (end - start);
+  return sold * progress;
+}
+
+function phaseRateAtTime(sold: number, salesStart?: string, salesEnd?: string, timestamp?: number) {
+  if (!sold || !salesStart || !timestamp) {
+    return 0;
+  }
+
+  const start = new Date(salesStart).getTime();
+  const end = salesEnd ? new Date(salesEnd).getTime() : PROTOTYPE_NOW.getTime();
+
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
+    return 0;
+  }
+
+  if (timestamp < start || timestamp > end) {
+    return 0;
+  }
+
+  const hours = Math.max((end - start) / ONE_HOUR_MS, 1);
+  return sold / hours;
+}
+
+function buildTwoHourRange(start: number, end: number) {
+  const range: number[] = [];
+  const step = 2 * ONE_HOUR_MS;
+  for (let timestamp = start; timestamp <= end; timestamp += step) {
+    range.push(timestamp);
+  }
+  if (range[range.length - 1] !== end) {
+    range.push(end);
+  }
+  return range;
+}
+
+function buildDailyRange(boundaries: number[], anchorTimestamp: number) {
+  const byDay = new Map<string, number>();
+
+  for (const timestamp of [...boundaries, anchorTimestamp]) {
+    const dayKey = new Date(timestamp).toISOString().slice(0, 10);
+    const previous = byDay.get(dayKey);
+    if (!previous || timestamp > previous) {
+      byDay.set(dayKey, timestamp);
+    }
+  }
+
+  return Array.from(byDay.values()).sort((a, b) => a - b);
+}
+
+function SummaryChart({
+  title,
+  valueLabel,
+  points,
+  control,
+  window,
+}: {
+  title: string;
+  valueLabel: string;
+  points: ChartPoint[];
+  control?: React.ReactNode;
+  window: TimeWindow;
+}) {
+  const width = 560;
+  const height = 180;
+  const chartLeft = 40;
+  const chartRight = 14;
+  const chartWidth = width - chartLeft - chartRight;
+  const path = buildLinePath(
+    points.map((point) => point.value),
+    chartWidth,
+    height,
+  );
+  const max = Math.max(...points.map((point) => point.value), 1);
+  const yTicks = [max, max * 0.75, max * 0.5, max * 0.25, 0].map((value) =>
+    Number(value.toFixed(1)),
+  );
+
+  return (
+    <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-body uppercase tracking-widerish text-fg">{title}</p>
+          <p className="mt-1 text-body-sm text-[#9aa1b2]">{valueLabel}</p>
+        </div>
+        {control ? <div className="shrink-0">{control}</div> : null}
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <div className="min-w-[34rem]">
+          <svg viewBox={`0 0 ${width} ${height + 28}`} className="h-[14rem] w-full">
+            <line
+              x1={chartLeft}
+              y1={height}
+              x2={width - chartRight}
+              y2={height}
+              stroke="#FFFFFF"
+              strokeWidth="1"
+            />
+            <line x1={chartLeft} y1="0" x2={chartLeft} y2={height} stroke="#FFFFFF" strokeWidth="1" />
+            {yTicks.map((tick, index) => {
+              const y = (height * index) / (yTicks.length - 1);
+              return (
+                <text
+                  key={`${title}-tick-${tick}-${index}`}
+                  x={chartLeft - 6}
+                  y={y + 4}
+                  textAnchor="end"
+                  fill="hsl(var(--muted))"
+                  fontSize="11"
+                >
+                  {tick}
+                </text>
+              );
+            })}
+            <path
+              d={path}
+              fill="none"
+              stroke="var(--accent-hex)"
+              strokeWidth="2.5"
+              transform={`translate(${chartLeft} 0)`}
+            />
+            {points.map((point, index) => {
+              const x =
+                points.length === 1
+                  ? chartLeft
+                  : chartLeft + (index * chartWidth) / (points.length - 1);
+              const y = height - (point.value / max) * height;
+              const textAnchor =
+                index === 0 ? "start" : index === points.length - 1 ? "end" : "middle";
+              return (
+                <g key={`${title}-${point.timestamp}-${index}`}>
+                  <circle cx={x} cy={y} r="4" fill="var(--accent-hex)" />
+                  <text
+                    x={x}
+                    y={height + 18}
+                    textAnchor={textAnchor}
+                    fill="hsl(var(--muted))"
+                    fontSize={window === "24h" ? "10" : "12"}
+                  >
+                    {point.label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+
+      <p className="mt-2 text-right text-body-sm text-[#9aa1b2]">Time</p>
+    </div>
+  );
+}
+
+export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
+  const [ticketsWindow, setTicketsWindow] = useState<TimeWindow>("full");
+  const [velocityWindow, setVelocityWindow] = useState<TimeWindow>("full");
+  const anchorTimestamp = useMemo(() => getAnchorTimestamp(sections), [sections]);
+
+  const metrics = useMemo(() => {
+    const totalCapacity = sections.reduce(
+      (sum, section) =>
+        sum + section.phases.reduce((inner, phase) => inner + parseNumber(phase.quantityAvailable), 0),
+      0,
+    );
+    const soldCapacity = sections.reduce(
+      (sum, section) =>
+        sum + section.phases.reduce((inner, phase) => inner + parseNumber(phase.quantitySold), 0),
+      0,
+    );
+    const totalRevenue = sections.reduce(
+      (sum, section) =>
+        sum +
+        section.phases.reduce(
+          (inner, phase) => inner + parseNumber(phase.price) * parseNumber(phase.quantitySold),
+          0,
+        ),
+      0,
+    );
+
+    const velocityValues = sections.flatMap((section) =>
+      section.phases.map((phase) =>
+        computeTicketsPerHour(
+          parseNumber(phase.quantitySold),
+          phase.salesStart,
+          phase.salesEnd,
+        ),
+      ),
+    );
+    const nonZeroVelocities = velocityValues.filter((value) => value > 0);
+    const averageVelocity = nonZeroVelocities.length
+      ? Number(
+          (
+            nonZeroVelocities.reduce((sum, value) => sum + value, 0) / nonZeroVelocities.length
+          ).toFixed(1),
+        )
+      : 0;
+
+    const weightedPriceBase = sections.reduce(
+      (sum, section) =>
+        sum +
+        section.phases.reduce((inner, phase) => inner + parseNumber(phase.quantityAvailable), 0),
+      0,
+    );
+    const weightedPriceTotal = sections.reduce(
+      (sum, section) =>
+        sum +
+        section.phases.reduce(
+          (inner, phase) => inner + parseNumber(phase.price) * parseNumber(phase.quantityAvailable),
+          0,
+        ),
+      0,
+    );
+    const averageTicketPrice = weightedPriceBase > 0 ? weightedPriceTotal / weightedPriceBase : 0;
+
+    return {
+      totalCapacity,
+      soldCapacity,
+      totalRevenue,
+      averageVelocity,
+      averageTicketPrice,
+    };
+  }, [sections]);
+
+  const sectionPerformance = useMemo(() => {
+    return sections.map((section) => {
+      const capacity = section.phases.reduce(
+        (sum, phase) => sum + parseNumber(phase.quantityAvailable),
+        0,
+      );
+      const sold = section.phases.reduce((sum, phase) => sum + parseNumber(phase.quantitySold), 0);
+      const revenue = section.phases.reduce(
+        (sum, phase) => sum + parseNumber(phase.price) * parseNumber(phase.quantitySold),
+        0,
+      );
+      const velocityValues = section.phases
+        .map((phase) =>
+          computeTicketsPerHour(
+            parseNumber(phase.quantitySold),
+            phase.salesStart,
+            phase.salesEnd,
+          ),
+        )
+        .filter((value) => value > 0);
+      const velocity = velocityValues.length
+        ? Number(
+            (
+              velocityValues.reduce((sum, value) => sum + value, 0) / velocityValues.length
+            ).toFixed(1),
+          )
+        : 0;
+
+      const livePhase = section.phases.find((phase) => phase.status === "live");
+      const upcomingPhase = section.phases.find((phase) => phase.status === "upcoming");
+      const statusLabel = livePhase
+        ? livePhase.name
+        : upcomingPhase
+          ? upcomingPhase.name
+          : "Sold Out";
+
+      return {
+        id: section.id,
+        name: section.name,
+        percentSold: capacity > 0 ? Math.round((sold / capacity) * 100) : 0,
+        revenue,
+        velocity,
+        statusLabel,
+      };
+    });
+  }, [sections]);
+
+  const boundaryTimestamps = useMemo(() => {
+    return sections
+      .flatMap((section) =>
+        section.phases.flatMap((phase) => {
+          const points: number[] = [];
+          if (phase.salesStart) {
+            points.push(new Date(phase.salesStart).getTime());
+          }
+          if (phase.salesEnd) {
+            points.push(new Date(phase.salesEnd).getTime());
+          }
+          return points;
+        }),
+      )
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp <= anchorTimestamp)
+      .sort((a, b) => a - b);
+  }, [anchorTimestamp, sections]);
+
+  const ticketsSoldPoints = useMemo(() => {
+    const timestamps = buildDailyRange(boundaryTimestamps, anchorTimestamp);
+
+    return timestamps.map((timestamp) => ({
+      label: formatAxisLabel(timestamp),
+      timestamp,
+      value: Math.round(
+        sections.reduce(
+          (sum, section) =>
+            sum +
+            section.phases.reduce(
+              (inner, phase) =>
+                inner +
+                soldByTime(
+                  parseNumber(phase.quantitySold),
+                  phase.salesStart,
+                  phase.salesEnd,
+                  timestamp,
+                ),
+              0,
+            ),
+          0,
+        ),
+      ),
+    }));
+  }, [anchorTimestamp, boundaryTimestamps, sections]);
+
+  const velocityPoints = useMemo(() => {
+    const timestamps = buildDailyRange(boundaryTimestamps, anchorTimestamp);
+
+    return timestamps.map((timestamp) => {
+      const totalVelocity = sections.reduce(
+        (sum, section) =>
+          sum +
+          section.phases.reduce(
+            (inner, phase) =>
+              inner +
+              phaseRateAtTime(
+                parseNumber(phase.quantitySold),
+                phase.salesStart,
+                phase.salesEnd,
+                timestamp,
+              ),
+            0,
+          ),
+        0,
+      );
+      return {
+        label: formatAxisLabel(timestamp),
+        timestamp,
+        value: Number(totalVelocity.toFixed(1)),
+      };
+    });
+  }, [anchorTimestamp, boundaryTimestamps, sections]);
+
+  const visibleTicketsSoldPoints = useMemo(() => {
+    if (ticketsWindow === "full") {
+      return ticketsSoldPoints;
+    }
+
+    const end = anchorTimestamp;
+    const start = end - 24 * ONE_HOUR_MS;
+    const hourlyRange = buildTwoHourRange(start, end);
+
+    return hourlyRange.map((timestamp) => ({
+      label: formatHourlyAxisLabel(timestamp),
+      timestamp,
+      value: Math.round(
+        sections.reduce(
+          (sum, section) =>
+            sum +
+            section.phases.reduce(
+              (inner, phase) =>
+                inner +
+                soldByTime(
+                  parseNumber(phase.quantitySold),
+                  phase.salesStart,
+                  phase.salesEnd,
+                  timestamp,
+                ),
+              0,
+            ),
+          0,
+        ),
+      ),
+    }));
+  }, [anchorTimestamp, sections, ticketsSoldPoints, ticketsWindow]);
+
+  const visibleVelocityPoints = useMemo(() => {
+    if (velocityWindow === "full") {
+      return velocityPoints;
+    }
+
+    const end = anchorTimestamp;
+    const start = end - 24 * ONE_HOUR_MS;
+    const hourlyRange = buildTwoHourRange(start, end);
+
+    return hourlyRange.map((timestamp) => {
+      const totalVelocity = sections.reduce(
+        (sum, section) =>
+          sum +
+          section.phases.reduce(
+            (inner, phase) =>
+              inner +
+              phaseRateAtTime(
+                parseNumber(phase.quantitySold),
+                phase.salesStart,
+                phase.salesEnd,
+                timestamp,
+              ),
+            0,
+          ),
+        0,
+      );
+      return {
+        label: formatHourlyAxisLabel(timestamp),
+        timestamp,
+        value: Number(totalVelocity.toFixed(1)),
+      };
+    });
+  }, [anchorTimestamp, sections, velocityPoints, velocityWindow]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <p className="text-body-sm uppercase tracking-widerish text-muted">Total Capacity</p>
+          <p className="mt-1 text-body text-fg">{metrics.totalCapacity}</p>
+        </div>
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <p className="text-body-sm uppercase tracking-widerish text-muted">Sold Capacity</p>
+          <p className="mt-1 text-body text-fg">{metrics.soldCapacity}</p>
+        </div>
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <p className="text-body-sm uppercase tracking-widerish text-muted">Total Revenue</p>
+          <p className="mt-1 text-body text-fg">{formatCurrency(metrics.totalRevenue)}</p>
+        </div>
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Velocity</p>
+          <p className="mt-1 text-body text-fg">{formatTicketsPerHour(metrics.averageVelocity)}</p>
+        </div>
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <p className="text-body-sm uppercase tracking-widerish text-muted">Avg Ticket Price</p>
+          <p className="mt-1 text-body text-fg">{formatCurrency(metrics.averageTicketPrice)}</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-body uppercase tracking-widerish text-fg">Section Performance Breakdown</p>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {sectionPerformance.map((section) => (
+            <div
+              key={section.id}
+              className="rounded-[var(--radius-surface)] border border-border bg-panel p-4"
+            >
+              <div className="space-y-4">
+                <div className="border-b border-border pb-3">
+                  <p className="truncate text-body uppercase tracking-[0.02em] text-fg">
+                    {section.name}
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-body text-muted">% Sold</p>
+                    <p className="text-body text-fg">{section.percentSold}%</p>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-body text-muted">Revenue</p>
+                    <p className="text-body text-fg">{formatCurrency(section.revenue)}</p>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-body text-muted">Velocity</p>
+                    <p className="text-body text-fg">{formatTicketsPerHour(section.velocity)}</p>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-body text-muted">Status</p>
+                    <p className="text-body text-fg">{section.statusLabel}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-body uppercase tracking-widerish text-fg">Ticket Metrics</p>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SummaryChart
+            title="Tickets Sold Cumulative"
+            valueLabel="Tickets sold"
+            points={visibleTicketsSoldPoints}
+            window={ticketsWindow}
+            control={
+              <DropdownSelect
+                value={ticketsWindow}
+                options={[
+                  { value: "full", label: "Full Cycle" },
+                  { value: "24h", label: "Last 24h" },
+                ]}
+                onChange={(nextValue) => setTicketsWindow(nextValue as TimeWindow)}
+                className="h-7 rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 text-body-sm text-white/72 outline-none focus:border-[var(--accent-hex)]"
+                optionClassName="text-body-sm"
+              />
+            }
+          />
+          <SummaryChart
+            title="Ticket Velocity"
+            valueLabel="Tickets per hour"
+            points={visibleVelocityPoints}
+            window={velocityWindow}
+            control={
+              <DropdownSelect
+                value={velocityWindow}
+                options={[
+                  { value: "full", label: "Full Cycle" },
+                  { value: "24h", label: "Last 24h" },
+                ]}
+                onChange={(nextValue) => setVelocityWindow(nextValue as TimeWindow)}
+                className="h-7 rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 text-body-sm text-white/72 outline-none focus:border-[var(--accent-hex)]"
+                optionClassName="text-body-sm"
+              />
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,5 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import {
+  DropdownSelect,
+  type DropdownSelectOption,
+} from "@/components/ui/dropdown-select";
+
 type HomeStatusFilter = "upcoming" | "past";
 type DateFilter = "all" | "sep-1-10" | "sep-11-20" | "sep-21-30";
 
@@ -34,56 +40,85 @@ export function FilterBar({
   onStatusChange,
   onDateChange,
 }: FilterBarProps) {
+  const [genre, setGenre] = useState<(typeof uiOnlyFilters.genre)[number]>(
+    uiOnlyFilters.genre[0],
+  );
+  const [location, setLocation] = useState<(typeof uiOnlyFilters.location)[number]>(
+    uiOnlyFilters.location[0],
+  );
+  const [type, setType] = useState<(typeof uiOnlyFilters.type)[number]>(
+    uiOnlyFilters.type[0],
+  );
+
+  const baseTriggerClassName =
+    "h-7 justify-start gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80";
+  const baseOptionClassName = "text-body-sm uppercase tracking-widerish";
+
+  const dateDropdownOptions: Array<DropdownSelectOption<DateFilter>> = dateOptions;
+  const genreOptions = uiOnlyFilters.genre.map((value) => ({ value, label: value }));
+  const locationOptions = uiOnlyFilters.location.map((value) => ({ value, label: value }));
+  const typeOptions = uiOnlyFilters.type.map((value) => ({ value, label: value }));
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
+      <div className="flex flex-wrap items-center gap-4">
+        <DropdownSelect
           value={date}
-          onChange={(event) => onDateChange(event.target.value as DateFilter)}
-          className="min-w-0 w-auto rounded-[var(--radius-button-tag)] border border-white/10 bg-transparent px-3 py-1 text-body-sm uppercase tracking-widerish text-muted outline-none transition hover:border-white/20 hover:text-fg"
-        >
-          {dateOptions.map((option) => (
-            <option
-              key={option.value}
-              value={option.value}
-              className="bg-panel text-fg"
-            >
-              {option.label}
-            </option>
-          ))}
-        </select>
+          options={dateDropdownOptions}
+          onChange={onDateChange}
+          className={baseTriggerClassName}
+          optionClassName={baseOptionClassName}
+        />
 
-        {Object.entries(uiOnlyFilters).map(([label, values]) => (
-          <select
-            key={label}
-            defaultValue={values[0]}
-            className="rounded-[var(--radius-button-tag)] border border-white/10 bg-transparent px-3 py-1 text-body-sm uppercase tracking-widerish text-muted outline-none transition hover:border-white/20 hover:text-fg"
-          >
-            {values.map((value) => (
-              <option key={value} value={value} className="bg-panel text-fg">
-                {value}
-              </option>
-            ))}
-          </select>
-        ))}
+        <DropdownSelect
+          value={genre}
+          options={genreOptions}
+          onChange={setGenre}
+          className={baseTriggerClassName}
+          optionClassName={baseOptionClassName}
+        />
+        <DropdownSelect
+          value={location}
+          options={locationOptions}
+          onChange={setLocation}
+          className={baseTriggerClassName}
+          optionClassName={baseOptionClassName}
+        />
+        <DropdownSelect
+          value={type}
+          options={typeOptions}
+          onChange={setType}
+          className={baseTriggerClassName}
+          optionClassName={baseOptionClassName}
+        />
       </div>
 
-      <div className="ml-auto inline-flex overflow-hidden rounded-[var(--radius-button-tag)] border border-white/10">
-        {statusOptions.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onStatusChange(option.value)}
-            className={[
-              "min-w-[8.5rem] px-3 py-1 text-center text-body-sm uppercase tracking-widerish transition",
-              status === option.value
-                ? "bg-white/8 text-fg"
-                : "bg-transparent text-muted hover:text-fg",
-            ].join(" ")}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="ml-auto inline-flex items-center gap-2">
+        {statusOptions.map((option, index) => {
+          const isActive = status === option.value;
+
+          return (
+            <div key={option.value} className="inline-flex items-end gap-2">
+              {index > 0 ? (
+                <span className="pb-[1px] text-lg uppercase tracking-widerish leading-none text-white">
+                  |
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onStatusChange(option.value)}
+                className={[
+                  "h-auto rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-lg uppercase tracking-widerish leading-none transition",
+                  isActive
+                    ? "bg-transparent text-white"
+                    : "text-muted hover:text-fg",
+                ].join(" ")}
+              >
+                {option.label}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

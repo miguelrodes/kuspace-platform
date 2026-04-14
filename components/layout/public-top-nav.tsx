@@ -1,5 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { GlobalSearchOverlay } from "@/components/layout/global-search-overlay";
+import { getPublicEventCollection } from "@/lib/event-status";
+import { cn } from "@/lib/utils/index";
+import { useMockEventsStore } from "@/lib/mock-store";
 
 type PublicTopNavProps = {
   title?: string;
@@ -10,49 +17,126 @@ export function PublicTopNav({
   title = "Nightlife Office",
   subtitle = "Public Event Network",
 }: PublicTopNavProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { events, profile } = useMockEventsStore();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const navItems = [
+    {
+      href: "/",
+      label: "Home",
+      active: pathname === "/" || pathname.startsWith("/events") || pathname.startsWith("/cons/events"),
+    },
+    {
+      href: "/cons/tickets",
+      label: "Tickets",
+      active: pathname === "/tickets" || pathname.startsWith("/cons/tickets"),
+    },
+    {
+      href: "/cons/profile/me",
+      label: "Profile",
+      active: pathname === "/consprofile" || pathname.startsWith("/cons/profile"),
+    },
+  ];
+
+  const handleNavigate = (href: string) => {
+    setIsSearchOpen(false);
+    router.push(href);
+  };
+
+  const promoters = Array.from(
+    new Map(
+      events
+        .flatMap((event) => event.promoters ?? [])
+        .map((promoter) => [
+          promoter.id,
+          {
+            id: promoter.id,
+            name: promoter.name,
+            avatarImageUrl: promoter.avatarImageUrl,
+            href: promoter.profileSlug ? `/cons/profile/${promoter.profileSlug}` : undefined,
+          },
+        ]),
+    ).values(),
+  );
+
   return (
-    <header className="border-b border-border bg-panel px-3 py-3 md:px-5">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 md:items-end">
-        <div className="flex min-w-0 items-center gap-2">
+    <header className="border-b border-border bg-panel px-4 pb-2 pt-3 md:px-6">
+      <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-2 md:items-end">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/" aria-label="Go to home">
+            <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
+          </Link>
           <Link
             href="/"
-            className="text-title uppercase tracking-[0.2em] transition hover:opacity-90"
-            style={{ color: "var(--accent-hex)" }}
+            className="text-title tracking-[0.14em] transition hover:opacity-90"
+            style={{ fontFamily: "var(--font-space-grotesk)", color: "#FFFFFF", fontWeight: 400 }}
           >
-            OFFICE
+            KUSPACE
           </Link>
-          <div className="min-w-0">
-            <div className="truncate text-body text-fg">{title}</div>
-            <div className="truncate text-body-sm uppercase tracking-widerish text-muted">
-              {subtitle}
-            </div>
-          </div>
         </div>
 
-        <div className="flex w-full flex-wrap items-center gap-3 pt-2 md:w-auto md:flex-nowrap md:gap-5 md:pt-5">
+        <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-20">
           <nav
             aria-label="Public navigation"
-            className="ml-3 flex items-center gap-5 text-body-lg text-muted md:ml-4"
+            className="ml-3 flex items-center gap-7 text-subheading text-muted md:ml-0 md:gap-8"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
-            <Link
-              href="/"
-              className="transition hover:text-fg"
-              style={{ color: "hsl(var(--text))" }}
-            >
-              Home
-            </Link>
-            <Link href="/login" className="transition hover:text-fg">
-              Login
-            </Link>
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                style={item.active ? { color: "#FFFFFF" } : undefined}
+                className={cn(
+                  "text-subheading uppercase tracking-widerish transition hover:text-fg",
+                  item.active ? "text-fg" : "text-muted",
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
           </nav>
-          <div className="min-w-0 flex-1 md:w-[16rem]">
-            <Input
-              placeholder="Search events, artists, venues..."
-              className="!h-7 w-full px-2.5 text-body-sm"
-            />
+
+          <div className="relative ml-1 translate-y-[2px]">
+            <button
+              type="button"
+              aria-label="Search events and recruiters"
+              onClick={() => setIsSearchOpen((current) => !current)}
+              className="inline-flex items-center justify-center text-muted transition hover:text-fg"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <circle cx="8.5" cy="8.5" r="5.5" />
+                <path d="M13 13L17 17" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
+      <GlobalSearchOverlay
+        open={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        events={getPublicEventCollection(events)}
+        nightclubs={[
+          {
+            id: profile.id,
+            name: profile.displayName,
+            slug: profile.slug,
+            avatarImageUrl: profile.media?.avatarImageUrl,
+          },
+        ]}
+        promoters={promoters}
+        eventHrefFor={(event) => `/cons/events/${event.slug}`}
+        nightclubHrefFor={(nightclub) => `/cons/profile/${nightclub.slug}`}
+        onNavigate={handleNavigate}
+      />
     </header>
   );
 }

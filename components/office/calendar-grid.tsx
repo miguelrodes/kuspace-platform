@@ -125,7 +125,7 @@ export function CalendarGrid({
                   {activeDay.events.map((event) => (
                     <Link
                       key={event.id}
-                      href={`/office/events/${event.id}/edit`}
+                      href={`/office/event-editor/${event.id}`}
                       onClick={onDayClose}
                       style={
                         event.status === "live"
@@ -133,7 +133,7 @@ export function CalendarGrid({
                           : undefined
                       }
                       className={cn(
-                        "group block overflow-hidden rounded-[var(--radius-surface)] border bg-panel-2 transition hover:border-white/20",
+                        "group block overflow-hidden rounded-[var(--radius-surface)] border bg-panel transition hover:border-white/20",
                         event.status === "draft"
                           ? "border-dashed border-white/10 opacity-65"
                           : event.status === "past"

@@ -10,7 +10,7 @@ export function MetaTag({ children, className }: MetaTagProps) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-[var(--radius-button-tag)] border border-border bg-panel-2 px-2.5 py-0 text-body-sm tracking-widerish leading-none text-fg",
+        "inline-flex shrink-0 items-center rounded-[0.35rem] border border-border bg-panel-2 px-2.5 py-0 text-body-sm tracking-widerish leading-none text-fg",
         className,
       )}
     >

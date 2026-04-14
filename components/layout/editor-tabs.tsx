@@ -8,7 +8,7 @@ const editorTabLabelMap: Record<EditorTab, string> = {
   lineup: "Lineup",
   timetable: "Timetable",
   guestlist: "Guestlist",
-  budget: "Budget",
+  budget: "Costs",
   tickets: "Tickets",
 };
 

@@ -9,10 +9,12 @@ import {
   type DateFilter,
   type HomeStatusFilter,
 } from "@/components/home/filter-bar";
+import { getPublicEventCollection } from "@/lib/event-status";
 
 type HomeFeedProps = {
   events: Event[];
   recruiter: RecruiterProfile;
+  audience?: "consumer" | "recruiter";
 };
 
 function matchesDateFilter(event: Event, dateFilter: DateFilter) {
@@ -33,21 +35,27 @@ function matchesDateFilter(event: Event, dateFilter: DateFilter) {
   return day >= 21 && day <= 30;
 }
 
-export function HomeFeed({ events, recruiter }: HomeFeedProps) {
+export function HomeFeed({
+  events,
+  recruiter,
+  audience = "consumer",
+}: HomeFeedProps) {
   const [status, setStatus] = useState<HomeStatusFilter>("upcoming");
   const [date, setDate] = useState<DateFilter>("all");
 
   const visibleEvents = useMemo(() => {
     const targetStatus = status === "upcoming" ? "live" : "past";
+    const sourceEvents = audience === "consumer" ? getPublicEventCollection(events) : events;
 
-    return events.filter(
+    return sourceEvents.filter(
       (event) =>
-        event.status === targetStatus && matchesDateFilter(event, date)
+        event.status === targetStatus &&
+        matchesDateFilter(event, date)
     );
-  }, [date, events, status]);
+  }, [audience, date, events, status]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <FilterBar
         status={status}
         date={date}
@@ -62,12 +70,13 @@ export function HomeFeed({ events, recruiter }: HomeFeedProps) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {visibleEvents.map((event) => (
             <EventFeedCard
               key={event.id}
               event={event}
               recruiter={recruiter}
+              audience={audience}
             />
           ))}
         </div>
