@@ -1,7 +1,10 @@
-export type EventCardVariant = "feed" | "profile" | "compact";
+export type EventCardVariant = "large" | "medium" | "compact";
+
+export const profileEventGridClassName =
+  "grid justify-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(13.25rem,13.25rem))]";
 
 export const eventCardVariants = {
-  feed: {
+  large: {
     container:
       "group block h-full min-h-[17.5rem] overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2.5 transition hover:border-white/20",
     posterAspect: "aspect-[2.2/1]",
@@ -11,15 +14,15 @@ export const eventCardVariants = {
     lineup: "mt-0 min-h-[2.3rem] overflow-hidden text-body-sm text-muted",
     footer: "mt-auto flex items-center justify-between gap-2 pt-1.5 text-body-sm text-muted",
   },
-  profile: {
+  medium: {
     container:
       "group relative h-full min-h-[20rem] overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-3 transition hover:border-white/20",
     posterAspect: "aspect-[2/1]",
     content: "relative z-10 flex h-full flex-col gap-3",
-    body: "flex flex-1 flex-col space-y-2",
-    title: "min-h-[3.2rem] overflow-hidden text-body-lg font-medium text-fg",
-    lineup: "mt-1 min-h-[2.6rem] overflow-hidden text-body-sm text-muted",
-    footer: "mt-auto pt-2",
+    body: "flex flex-1 flex-col space-y-1.5",
+    title: "overflow-hidden whitespace-nowrap text-body-lg font-medium text-fg text-ellipsis",
+    lineup: "mt-0.5 min-h-[1.35rem] overflow-hidden text-body-sm text-muted",
+    footer: "pt-0",
   },
   compact: {
     container:

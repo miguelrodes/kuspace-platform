@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EventPoster } from "@/components/home/event-poster";
-import { EventFeedCard } from "@/components/home/event-feed-card";
+import { EventCard } from "@/components/events/event-card";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
 import { RecruiterTopNav } from "@/components/layout/recruiter-top-nav";
 import { ConfirmDialog } from "@/components/ui/action-dialog";
@@ -15,10 +15,11 @@ import {
   getPublicEventCollection,
   isPublicEventStatus,
 } from "@/lib/event-status";
+import { formatCompactEventDate } from "@/lib/utils/date";
 import {
+  canUserSeeTicketSection,
   getEventAccessAssignment,
   getEventApplication,
-  getVisibleTicketSectionsForUser,
 } from "@/lib/event-access";
 import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
@@ -39,10 +40,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDisplayDate(date: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(date));
+  return formatCompactEventDate(date);
 }
 
 function formatDisplayLocation(location: string) {
@@ -124,68 +122,62 @@ function TicketSectionBlock({
         </h3>
       </div>
 
-      <div className="-mx-1 overflow-x-auto pb-2">
-        <div className="flex min-w-max gap-3 px-1">
+      <div className="overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel">
         {section.phases.map((phase) => {
           const isActive = phase.id === activePhaseId;
           const isMutedPhase = phase.status !== "live";
+          const showDivider = phase.id !== section.phases[section.phases.length - 1]?.id;
+          const isClickable = phase.status !== "sold_out";
 
           return (
-            <div
+            <button
               key={phase.id}
-              className={`w-[11.25rem] shrink-0 rounded-[var(--radius-surface)] border px-3 py-2 ${
-                isActive
-                  ? "bg-panel"
-                  : "border-border bg-panel"
-              } ${phase.status === "sold_out" ? "opacity-60" : ""} ${
-                phase.status === "upcoming" ? "opacity-90" : ""
-              }`}
-              style={isActive ? { borderColor: "var(--accent-hex)" } : undefined}
+              type="button"
+              disabled={!isClickable}
+              onClick={() => {
+                if (isClickable) {
+                  onPurchase(section.id);
+                }
+              }}
+              className={`block w-full px-4 py-2 text-left transition ${
+                phase.status === "sold_out" ? "cursor-default opacity-60" : "cursor-pointer"
+              } ${phase.status === "upcoming" ? "opacity-90" : ""}`}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <div className="min-w-0 flex flex-1 items-center gap-2">
+                  {isActive ? (
+                    <span
+                      className="h-[1.05rem] w-[2px] shrink-0 rounded-full"
+                      style={{ backgroundColor: "var(--accent-hex)" }}
+                    />
+                  ) : null}
+
+                  <p
+                    className={`min-w-0 truncate text-body uppercase tracking-widerish ${
+                      isMutedPhase ? "text-white/70" : "text-fg"
+                    }`}
+                  >
+                    {phase.name}
+                  </p>
+                </div>
+
+                {phase.status === "sold_out" ? (
+                  <p className="shrink-0 text-body-sm text-muted">Sold Out</p>
+                ) : null}
+
                 <p
-                  className={`truncate whitespace-nowrap text-body-lg uppercase tracking-widerish ${
+                  className={`shrink-0 text-body-sm ${
                     isMutedPhase ? "text-white/70" : "text-fg"
                   }`}
                 >
-                  {phase.name}
+                  {formatCurrency(phase.price)}
                 </p>
               </div>
 
-              <div className="mt-1.5 border-t border-border" />
-
-              <div className="mt-2">
-                <div className="flex items-baseline gap-2">
-                  <p className={`text-body ${phase.status === "live" ? "text-[#FFFFFF]" : "text-muted"}`}>Price</p>
-                  <p className={`text-body ${isMutedPhase ? "text-white/70" : "text-fg"}`}>
-                    {formatCurrency(phase.price)}
-                  </p>
-                </div>
-              </div>
-
-              {phase.status === "sold_out" ? (
-                <div className="mt-2.5 flex min-h-[1.35rem] items-end justify-center">
-                  <p className="text-body-sm text-muted">Sold Out</p>
-                </div>
-              ) : null}
-
-              {phase.status === "live" ? (
-                <div className="mt-2.5 flex min-h-[1.35rem] items-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-7 border border-[#FFFFFF] bg-transparent px-2.5 text-body-sm uppercase tracking-[0.08em] hover:bg-transparent"
-                    style={{ color: "var(--accent-hex)" }}
-                    onClick={() => onPurchase(section.id)}
-                  >
-                    Get Tickets
-                  </Button>
-                </div>
-              ) : null}
-            </div>
+              {showDivider ? <div className="mt-2 border-t border-border" /> : null}
+            </button>
           );
         })}
-      </div>
       </div>
     </section>
   );
@@ -204,6 +196,11 @@ export function PublicEventDetailPage({
     applyToCuratedEvent,
     purchaseTicketSection,
   } = useMockEventsStore();
+  const hasHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [showApplyDialog, setShowApplyDialog] = useState(false);
 
   const event = getEventBySlug(slug);
@@ -239,6 +236,47 @@ export function PublicEventDetailPage({
     },
     [audience, event, events],
   );
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen bg-bg text-fg">
+        {audience === "recruiter" ? (
+          <RecruiterTopNav />
+        ) : (
+          <PublicTopNav title="Nightlife Office" subtitle="Public Event Network" />
+        )}
+
+        <main className="px-4 py-8 md:px-6">
+          <div className="mx-auto max-w-7xl space-y-8">
+            <section className="rounded-[var(--radius-surface)] border border-border bg-panel p-5 md:p-6">
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)] xl:items-start">
+                <div className="space-y-6">
+                  <div className="aspect-[16/10] max-w-[31rem] rounded-[var(--radius-surface)] border border-border bg-bg" />
+                  <div className="max-w-[31rem] space-y-3">
+                    <div className="h-5 w-40 rounded bg-bg" />
+                    <div className="h-4 w-full rounded bg-bg" />
+                    <div className="h-4 w-5/6 rounded bg-bg" />
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-3">
+                    <div className="h-9 w-72 rounded bg-bg" />
+                    <div className="h-5 w-44 rounded bg-bg" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-5 w-28 rounded bg-bg" />
+                    <div className="h-4 w-full rounded bg-bg" />
+                    <div className="h-4 w-4/5 rounded bg-bg" />
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (
     !event ||
@@ -286,9 +324,19 @@ export function PublicEventDetailPage({
 
   const visibleTicketSections =
     audience === "consumer"
-      ? getVisibleTicketSectionsForUser(event, currentConsumer?.id)
+      ? (event.tickets.sections ?? []).filter((section) => {
+          if (section.phases.length === 0) {
+            return false;
+          }
+
+          if (event.admissionMode === "curated" && !currentAssignment) {
+            return false;
+          }
+
+          return canUserSeeTicketSection(section, currentAssignment);
+        })
       : (event.tickets.sections ?? []).filter(
-          (section) => section.visibility !== "hidden" && section.phases.length > 0,
+          (section) => section.visibility === "public" && section.phases.length > 0,
         );
   const showTicketsSection =
     isPublicEventStatus(event.status) &&
@@ -333,7 +381,10 @@ export function PublicEventDetailPage({
 		              <div className="space-y-5">
 		                <div className="flex flex-wrap items-center justify-between gap-4">
 		                  <div className="space-y-1">
-		                    <h1 className="text-title font-medium tracking-tightish text-fg">
+		                    <h1
+		                      className="text-title-lg font-medium tracking-tightish text-fg"
+		                      style={{ fontFamily: "var(--font-space-grotesk)" }}
+		                    >
 		                      {event.cover.title}
 		                    </h1>
 		                  </div>
@@ -612,7 +663,10 @@ export function PublicEventDetailPage({
             <section id="tickets" className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-heading-sm uppercase tracking-widerish text-[var(--accent-hex)]">
+                  <p
+                    className="text-heading uppercase tracking-widerish text-[var(--accent-hex)]"
+                    style={{ fontFamily: "var(--font-space-grotesk)" }}
+                  >
                     Tickets
                   </p>
                 </div>
@@ -651,11 +705,26 @@ export function PublicEventDetailPage({
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {relatedEvents.map((relatedEvent) => (
-                  <EventFeedCard
+                  <EventCard
                     key={relatedEvent.id}
-                    event={relatedEvent}
-                    recruiter={recruiter}
-                    audience={audience}
+                    variant="large"
+                    imageUrl={relatedEvent.cover.imageUrl}
+                    imageAlt={relatedEvent.cover.imageAlt}
+                    date={relatedEvent.cover.date}
+                    title={relatedEvent.cover.title}
+                    lineupPreview={relatedEvent.lineup.entries.map((entry) => entry.name).join(", ")}
+                    href={audience === "recruiter" ? `/rec/events/${relatedEvent.slug}` : `/cons/events/${relatedEvent.slug}`}
+                    ariaLabel={`View ${relatedEvent.cover.title}`}
+                    footer={
+                      <>
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                          {relatedEvent.cover.location || "Location"}
+                        </span>
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                          {relatedEvent.cover.venue || recruiter.displayName}
+                        </span>
+                      </>
+                    }
                   />
                 ))}
               </div>

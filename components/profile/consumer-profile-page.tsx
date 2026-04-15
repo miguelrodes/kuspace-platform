@@ -1,11 +1,13 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { EventCard } from "@/components/events/event-card";
+import { EventMetaRow } from "@/components/home/event-meta-row";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EventFeedCard } from "@/components/home/event-feed-card";
 import { SectionNav } from "@/components/ui/section-nav";
+import { profileEventGridClassName } from "@/components/office/event-card-variants";
 import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
 
@@ -41,13 +43,13 @@ function Avatar({
       <img
         src={normalizedAvatarImageUrl}
         alt={`${firstName} ${lastName}`}
-        className="h-24 w-24 rounded-full border border-border object-cover"
+        className="h-36 w-36 rounded-full border border-border object-cover"
       />
     );
   }
 
   return (
-    <div className="relative h-24 w-24 overflow-hidden rounded-full border border-border bg-panel">
+    <div className="relative h-36 w-36 overflow-hidden rounded-full border border-border bg-panel">
       <span
         aria-hidden="true"
         className="absolute left-1/2 top-[44%] h-px w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-45deg] bg-white/22"
@@ -91,17 +93,10 @@ function SettingsModal({
         className="max-h-[82vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-surface)] border border-border bg-panel p-5 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <h2 className="text-subheading uppercase tracking-[0.12em] text-[var(--accent-hex)]">
             Settings
           </h2>
-          <button
-            type="button"
-            className="text-body text-muted transition hover:text-fg"
-            onClick={onClose}
-          >
-            Close
-          </button>
         </div>
 
         <div className="mt-4 space-y-5">
@@ -288,41 +283,87 @@ function CityCombobox({
   );
 }
 
-function EventLibraryPanel({
-  activeSection,
-  onSectionChange,
+function EventLibraryContent({
   events,
 }: {
-  activeSection: "saved" | "upcoming" | "past";
-  onSectionChange: (section: "saved" | "upcoming" | "past") => void;
   events: ReturnType<typeof useMockEventsStore>["events"];
 }) {
   const { profile } = useMockEventsStore();
-  const sectionItems = ["SAVED", "UPCOMING", "PAST"];
 
   return (
-    <div className="space-y-4 pt-8">
-      <SectionNav
-        items={sectionItems}
-        activeItem={activeSection.toUpperCase()}
-        onChange={(item) => onSectionChange(item.toLowerCase() as "saved" | "upcoming" | "past")}
-      />
-
+    <>
       {events.length === 0 ? (
         <p className="text-body-sm text-muted">No events in this section yet.</p>
       ) : (
-        <div className="-mx-1 overflow-x-auto pb-2">
-          <div className="flex min-w-max gap-4 px-1">
+        <div className="max-h-[25.5rem] overflow-y-auto pr-2">
+          <div className="grid justify-start gap-y-4 xl:gap-x-3 xl:[grid-template-columns:repeat(5,13.25rem)]">
             {events.map((event) => (
-              <div key={event.id} className="w-[18rem] shrink-0">
-                <EventFeedCard
-                  event={event}
-                  recruiter={profile}
-                  audience="consumer"
-                />
-              </div>
+              <EventCard
+                key={event.id}
+                variant="medium"
+                imageUrl={event.cover.imageUrl}
+                imageAlt={event.cover.imageAlt}
+                date={event.cover.date}
+                title={event.cover.title}
+                lineupPreview={event.lineup.entries.map((entry) => entry.name).join(", ")}
+                href={`/cons/events/${event.slug}`}
+                hrefMode="overlay"
+                ariaLabel={`View ${event.cover.title}`}
+                footer={
+                  <EventMetaRow
+                    location={event.cover.location}
+                    recruiterName={profile.displayName}
+                    recruiterSlug={profile.slug}
+                    audience="consumer"
+                  />
+                }
+              />
             ))}
           </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ArtistsSeenContent({
+  artists,
+}: {
+  artists: string[];
+}) {
+  const [query, setQuery] = useState("");
+  const filteredArtists = useMemo(() => {
+    const sortedArtists = [...artists].sort((a, b) => a.localeCompare(b));
+
+    if (!query.trim()) {
+      return sortedArtists;
+    }
+
+    return sortedArtists.filter((artist) =>
+      artist.toLowerCase().includes(query.trim().toLowerCase()),
+    );
+  }, [artists, query]);
+
+  return (
+    <div className="w-[11rem] space-y-3">
+      <Input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search artists"
+        className="relative right-[2px] !h-7 w-full px-2.5 text-body-sm"
+      />
+
+      {filteredArtists.length === 0 ? (
+        <p className="text-body-sm text-muted">
+          {artists.length === 0 ? "No artists tracked yet." : "No artists match this search."}
+        </p>
+      ) : (
+        <div className="max-h-[25.5rem] w-full space-y-1 overflow-y-auto text-body text-muted">
+          {filteredArtists.map((artist) => (
+            <p key={artist} className="truncate">
+              {artist}
+            </p>
+          ))}
         </div>
       )}
     </div>
@@ -350,13 +391,57 @@ export function ConsumerProfilePageView() {
     [currentUser?.savedEventSlugs, events],
   );
   const upcomingEvents = useMemo(
-    () => events.filter((event) => currentUser?.upcomingTicketEventSlugs?.includes(event.slug)),
+    () =>
+      events.filter(
+        (event) =>
+          currentUser?.upcomingTicketEventSlugs?.includes(event.slug) &&
+          event.status !== "past",
+      ),
     [currentUser?.upcomingTicketEventSlugs, events],
   );
   const pastEvents = useMemo(
-    () => events.filter((event) => currentUser?.pastTicketEventSlugs?.includes(event.slug)),
+    () =>
+      events.filter(
+        (event) =>
+          currentUser?.pastTicketEventSlugs?.includes(event.slug) &&
+          event.status === "past",
+      ),
     [currentUser?.pastTicketEventSlugs, events],
   );
+  const checkedInPastEvents = useMemo(
+    () =>
+      pastEvents.filter((event) => {
+        const assignment = event.accessAssignments.find(
+          (candidate) => candidate.userId === currentUser?.id,
+        );
+        if (assignment?.checkedIn) {
+          return true;
+        }
+
+        return event.guestlist.entries.some(
+          (entry) =>
+            entry.checkedIn &&
+            (("userId" in entry && entry.userId === currentUser?.id) || false),
+        );
+      }),
+    [currentUser?.id, pastEvents],
+  );
+  const sourceEventsForArtistsSeen =
+    checkedInPastEvents.length > 0 ? checkedInPastEvents : pastEvents;
+  const artistsSeen = useMemo(() => {
+    const deduped = new Set<string>();
+
+    sourceEventsForArtistsSeen.forEach((event) => {
+      event.lineup.entries.forEach((entry) => {
+        const nextName = entry.name.trim();
+        if (nextName) {
+          deduped.add(nextName);
+        }
+      });
+    });
+
+    return Array.from(deduped);
+  }, [sourceEventsForArtistsSeen]);
   const activeEvents = activeEventSection === "saved"
     ? savedEvents
     : activeEventSection === "upcoming"
@@ -376,7 +461,7 @@ export function ConsumerProfilePageView() {
       <div className="min-h-screen bg-bg text-fg">
         <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />
         <main className="px-4 py-8 md:px-6">
-          <div className="mx-auto max-w-6xl rounded-[var(--radius-surface)] border border-border bg-panel p-6">
+          <div className="mx-auto w-full max-w-none rounded-[var(--radius-surface)] border border-border bg-panel p-6">
             <p className="text-body text-muted">Profile not found.</p>
           </div>
         </main>
@@ -439,8 +524,8 @@ export function ConsumerProfilePageView() {
       <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />
 
       <main className="px-4 py-8 md:px-6">
-        <div className="mx-auto max-w-6xl space-y-4">
-          <section className="rounded-[var(--radius-surface)] border border-border bg-panel p-5">
+        <div className="mx-auto w-full max-w-none space-y-2">
+          <section className="rounded-[var(--radius-surface)] border border-border bg-panel px-5 pt-5 pb-1">
             <div className="space-y-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-6 pl-4">
@@ -451,7 +536,7 @@ export function ConsumerProfilePageView() {
                       avatarImageUrl={currentUser.avatarImageUrl}
                     />
                     {isEditing ? (
-                      <div className="flex w-24 justify-center translate-x-[4px]">
+                      <div className="flex w-36 justify-center translate-x-[4px]">
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -531,17 +616,20 @@ export function ConsumerProfilePageView() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-1.5">
                         <p className="text-subheading text-fg">@{currentUser.username}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-lg text-fg">
+                        <div
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-heading-sm text-fg"
+                          style={{ fontFamily: "var(--font-space-grotesk)" }}
+                        >
                           <p>{currentUser.firstName}</p>
                           <p>{currentUser.lastName}</p>
                         </div>
-                        <p className="text-body text-fg">{currentUser.city}</p>
+                        <p className="text-lg text-fg">{currentUser.city}</p>
                       </div>
                     )}
 
-                    <div className="space-y-2 pt-1">
+                    <div className="space-y-1.5 pt-0">
                       <p className="text-lg tracking-[0.04em] text-fg">Genres</p>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -605,7 +693,7 @@ export function ConsumerProfilePageView() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="ml-auto translate-x-3 flex items-center gap-px">
                   <Button
                     type="button"
                     variant="ghost"
@@ -627,11 +715,33 @@ export function ConsumerProfilePageView() {
                 </div>
               </div>
             </div>
-              <EventLibraryPanel
-                activeSection={activeEventSection}
-                onSectionChange={setActiveEventSection}
-                events={activeEvents}
-              />
+              <div className="pt-7">
+                <div className="grid gap-0 xl:grid-cols-[69.25rem_12rem] xl:justify-start">
+                  <div className="space-y-3 xl:pr-0">
+                    <SectionNav
+                      items={["SAVED", "UPCOMING", "PAST"]}
+                      activeItem={activeEventSection.toUpperCase()}
+                      onChange={(item) =>
+                        setActiveEventSection(item.toLowerCase() as "saved" | "upcoming" | "past")
+                      }
+                    />
+
+                    <EventLibraryContent events={activeEvents} />
+                  </div>
+
+                  <div className="xl:self-stretch xl:ml-6 xl:border-l xl:border-border xl:pl-6">
+                    <div className="space-y-3 xl:w-fit">
+                      <h2
+                        className="relative top-[7px] text-left text-body-lg uppercase tracking-[0.01em]"
+                        style={{ color: "#FFFFFF" }}
+                      >
+                        Artists Seen
+                      </h2>
+                      <ArtistsSeenContent artists={artistsSeen} />
+                    </div>
+                  </div>
+                </div>
+              </div>
           </section>
         </div>
       </main>

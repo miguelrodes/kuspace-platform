@@ -741,7 +741,6 @@ export function EventEditorShell(props: EventEditorShellProps) {
   const [coverErrors, setCoverErrors] = useState<CoverFieldErrors>({});
   const [timetableRowErrors, setTimetableRowErrors] = useState<Record<string, TimetableRowErrors>>({});
   const [hasPendingAutosave, setHasPendingAutosave] = useState(false);
-  const [showDeleteDraftDialog, setShowDeleteDraftDialog] = useState(false);
   const [showCoverEditWarning, setShowCoverEditWarning] = useState(false);
   const [pendingCoverValue, setPendingCoverValue] = useState<CoverFormState | null>(null);
   const [hasAcknowledgedCoverEditWarning, setHasAcknowledgedCoverEditWarning] = useState(false);
@@ -995,22 +994,17 @@ export function EventEditorShell(props: EventEditorShellProps) {
       <EventEditorHeader status={localStatus} />
 
       <div className="pt-3">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-        <EditorTabNav activeTab={activeTab} onChange={setActiveTab} />
-        <EditorActionBar
-          status={localStatus}
-          readOnly={isReadOnly}
-          canDeleteDraft={Boolean(currentEventId) && localStatus === "draft"}
-          onPublish={() => persistEditorDraft("live")}
-          onLock={handleLockEvent}
-          onRevertToDraft={() => persistEditorDraft("draft")}
-          onDeleteDraft={() => {
-            if (!currentEventId) {
-              return;
-            }
-            setShowDeleteDraftDialog(true);
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-4">
+          <EditorTabNav activeTab={activeTab} onChange={setActiveTab} />
+          <div className="ml-auto">
+            <EditorActionBar
+              status={localStatus}
+              readOnly={isReadOnly}
+              onPublish={() => persistEditorDraft("live")}
+              onLock={handleLockEvent}
+              onRevertToDraft={() => persistEditorDraft("draft")}
+            />
+          </div>
         </div>
       </div>
 
@@ -1116,39 +1110,6 @@ export function EventEditorShell(props: EventEditorShellProps) {
           />
         </fieldset>
       </div>
-
-      {showDeleteDraftDialog && currentEventId ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4"
-          onClick={() => setShowDeleteDraftDialog(false)}
-        >
-          <div
-            className="w-full max-w-[27.5rem] rounded-[var(--radius-surface)] border border-border bg-panel px-5 pt-4.5 pb-4.5 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h3 className={`w-[21rem] ${DIALOG_TITLE_CLASS} text-[#FFFFFF]`}>
-              Delete Event Draft
-            </h3>
-            <p className="mt-2 w-[21rem] whitespace-nowrap text-body text-fg">
-              Delete this event draft? This cannot be undone.
-            </p>
-            <div className="mt-3 flex justify-center">
-              <button
-                type="button"
-                className={`appearance-none ${DIALOG_ACTION_CLASS} inline-flex items-center justify-center whitespace-nowrap px-2 leading-none font-medium transition hover:opacity-80`}
-                style={{ color: "var(--accent-hex)" }}
-                onClick={() => {
-                  deleteEvent(currentEventId);
-                  setShowDeleteDraftDialog(false);
-                  router.replace("/office");
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {showCoverEditWarning ? (
         <ConfirmDialog

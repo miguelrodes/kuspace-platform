@@ -8,16 +8,13 @@ import { getEventAccessAssignment, isQrActiveForAssignment } from "@/lib/event-a
 import { canConsumerAccessEvent } from "@/lib/event-status";
 import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
+import { formatFullEventDate } from "@/lib/utils/date";
 import type { ConsumerTicketWalletEntry } from "@/types/user";
 
 type TicketSection = "upcoming" | "past";
 
 function formatEventDate(date: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(`${date}T00:00:00.000Z`));
+  return formatFullEventDate(date);
 }
 
 function formatPaymentStateLabel(paymentState: "not_required" | "pending" | "paid" | "waived") {
@@ -77,19 +74,7 @@ function TicketDetailModal({
         className="w-full max-w-2xl rounded-[var(--radius-surface)] border border-border bg-panel p-5 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div />
-          <button
-            type="button"
-            className="text-body transition hover:opacity-80"
-            style={{ color: "var(--accent-hex)" }}
-            onClick={onClose}
-          >
-            Close
-          </button>
-        </div>
-
-        <div className="mt-3 max-h-[72vh] overflow-y-auto pr-1">
+        <div className="max-h-[72vh] overflow-y-auto pr-1">
           <div className="space-y-4">
             {tickets.flatMap((ticket, ticketGroupIndex) =>
               Array.from({ length: ticket.quantity }).map((_, ticketIndex) => {
@@ -445,7 +430,7 @@ export function ConsumerTicketsPage() {
       <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />
 
       <main className="px-4 py-8 md:px-6 md:py-8">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <section className="rounded-[var(--radius-surface)] border border-border bg-panel px-5 pb-6 pt-2 md:px-6 md:pb-8 md:pt-2.5">
             <div className="space-y-4">
               <div className="flex items-end justify-between gap-4">
@@ -460,7 +445,7 @@ export function ConsumerTicketsPage() {
                   Tickets
                 </h1>
 
-                <div className="inline-flex items-end gap-2 self-end">
+                <div className="inline-flex translate-x-4 items-end gap-2 self-end">
                   {(["upcoming", "past"] as const).map((item, index) => (
                     <div key={item} className="inline-flex items-end gap-2">
                       {index > 0 ? (

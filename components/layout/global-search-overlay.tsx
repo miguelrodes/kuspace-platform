@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Event } from "@/types/event";
+import { formatCompactEventDate } from "@/lib/utils/date";
 
 type SearchNightclub = {
   id: string;
@@ -33,15 +34,7 @@ function formatEventSearchDate(date: string) {
     return "";
   }
 
-  const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(parsedDate);
+  return formatCompactEventDate(date);
 }
 
 function normalize(value: string) {

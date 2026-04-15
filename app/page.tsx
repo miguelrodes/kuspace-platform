@@ -14,11 +14,11 @@ export default function HomePage() {
         subtitle="Clubs, Brands, Collectives"
       />
 
-      <main className="px-4 py-6 md:px-6">
-        <div className="mx-auto max-w-6xl space-y-2">
-          <header className="space-y-1">
+      <main className="px-4 py-3 md:px-6">
+        <div className="mx-auto max-w-7xl space-y-1.5">
+          <header className="space-y-0.5">
             <h1
-              className="text-heading uppercase"
+              className="text-heading !font-normal uppercase"
               style={{
                 color: "var(--accent-hex)",
                 fontFamily: "var(--font-space-grotesk)",

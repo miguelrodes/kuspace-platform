@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import type { Event } from "@/types/event";
 import type { RecruiterProfile } from "@/types/profile";
-import { ProfileEventCard } from "@/components/profile/profile-event-card";
+import { EventCard } from "@/components/events/event-card";
+import { EventMetaRow } from "@/components/home/event-meta-row";
+import { profileEventGridClassName } from "@/components/office/event-card-variants";
 
 type ProfileEventsPanelProps = {
   profile: RecruiterProfile;
@@ -69,13 +71,27 @@ export function ProfileEventsPanel({
         <p className="text-body-sm text-muted">No events in this section.</p>
       ) : (
         <div className="max-h-[32rem] overflow-y-auto pr-1">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className={profileEventGridClassName}>
             {visibleEvents.map((event) => (
-              <ProfileEventCard
+              <EventCard
                 key={event.id}
-                event={event}
-                recruiter={profile}
-                audience={audience}
+                variant="medium"
+                imageUrl={event.cover.imageUrl}
+                imageAlt={event.cover.imageAlt}
+                date={event.cover.date}
+                title={event.cover.title}
+                lineupPreview={event.lineup.entries.map((entry) => entry.name).join(", ")}
+                href={audience === "recruiter" ? `/rec/events/${event.slug}` : `/cons/events/${event.slug}`}
+                hrefMode="overlay"
+                ariaLabel={`View ${event.cover.title}`}
+                footer={
+                  <EventMetaRow
+                    location={event.cover.location}
+                    recruiterName={profile.displayName}
+                    recruiterSlug={profile.slug}
+                    audience={audience}
+                  />
+                }
               />
             ))}
           </div>

@@ -51,8 +51,8 @@ export function FilterBar({
   );
 
   const baseTriggerClassName =
-    "h-7 justify-start gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80";
-  const baseOptionClassName = "text-body-sm uppercase tracking-widerish";
+    "h-7 justify-start gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm tracking-widerish text-fg transition hover:opacity-80";
+  const baseOptionClassName = "text-body-sm tracking-widerish";
 
   const dateDropdownOptions: Array<DropdownSelectOption<DateFilter>> = dateOptions;
   const genreOptions = uiOnlyFilters.genre.map((value) => ({ value, label: value }));
@@ -61,7 +61,7 @@ export function FilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="-ml-2 flex flex-wrap items-center gap-3">
         <DropdownSelect
           value={date}
           options={dateDropdownOptions}
@@ -93,7 +93,7 @@ export function FilterBar({
         />
       </div>
 
-      <div className="ml-auto inline-flex items-center gap-2">
+      <div className="ml-auto translate-x-2 inline-flex items-center gap-2">
         {statusOptions.map((option, index) => {
           const isActive = status === option.value;
 

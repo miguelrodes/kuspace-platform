@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Event } from "@/types/event";
 import type { RecruiterProfile } from "@/types/profile";
-import { EventFeedCard } from "@/components/home/event-feed-card";
+import { EventCard } from "@/components/events/event-card";
 import {
   FilterBar,
   type DateFilter,
@@ -55,7 +55,7 @@ export function HomeFeed({
   }, [audience, date, events, status]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <FilterBar
         status={status}
         date={date}
@@ -72,11 +72,26 @@ export function HomeFeed({
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {visibleEvents.map((event) => (
-            <EventFeedCard
+            <EventCard
               key={event.id}
-              event={event}
-              recruiter={recruiter}
-              audience={audience}
+              variant="large"
+              imageUrl={event.cover.imageUrl}
+              imageAlt={event.cover.imageAlt}
+              date={event.cover.date}
+              title={event.cover.title}
+              lineupPreview={event.lineup.entries.map((entry) => entry.name).join(", ")}
+              href={audience === "recruiter" ? `/rec/events/${event.slug}` : `/cons/events/${event.slug}`}
+              ariaLabel={`View ${event.cover.title}`}
+              footer={
+                <>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                    {event.cover.location || "Location"}
+                  </span>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                    {event.cover.venue || recruiter.displayName}
+                  </span>
+                </>
+              }
             />
           ))}
         </div>

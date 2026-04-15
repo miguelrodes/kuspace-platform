@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { MetaTag } from "@/components/ui/meta-tag";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { EventPoster } from "@/components/home/event-poster";
-import { OfficeEventCard } from "@/components/office/office-event-card";
+import { EventCard } from "@/components/events/event-card";
 import type { AdmissionMode, EventDisplayMode } from "@/types/event";
 
 export type RoomDraft = {
@@ -620,14 +620,23 @@ export function CoverTab({ value, errors, lineupPreview, onChange }: CoverTabPro
                 Card Preview
               </p>
 
-              <OfficeEventCard
+              <EventCard
+                variant="large"
                 imageUrl={effectiveImageUrl || "/mock/event-covers/draft-placeholder.jpg"}
                 imageAlt={value.imageAlt || "Event card preview"}
                 date={value.date}
                 title={value.title}
                 lineupPreview={lineupPreview}
-                location={value.location}
-                venue={value.venue}
+                footer={
+                  <>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                      {value.location || "Location"}
+                    </span>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                      {value.venue || "Venue"}
+                    </span>
+                  </>
+                }
               />
             </div>
           </div>

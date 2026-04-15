@@ -32,11 +32,11 @@ export function DJNetworkPanel({ events }: DJNetworkPanelProps) {
   }, [events, query]);
 
   return (
-    <div className="space-y-2 px-4 py-8">
+    <div className="space-y-2 px-4 py-4">
       <div className="space-y-3">
         <h2
-          className="-ml-1 text-body-lg whitespace-nowrap text-center uppercase tracking-[0.01em]"
-          style={{ color: "#FFFFFF" }}
+          className="relative top-[2px] whitespace-nowrap text-left text-lg uppercase tracking-[0.01em]"
+          style={{ color: "#FFFFFF", fontFamily: "var(--font-space-grotesk)" }}
         >
           Artists Performed
         </h2>
@@ -44,14 +44,14 @@ export function DJNetworkPanel({ events }: DJNetworkPanelProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search artists"
-          className="!-ml-1 !h-7 max-w-[11rem] px-2.5 text-body-sm"
+          className="!h-7 max-w-[11rem] px-2.5 text-body-sm"
         />
       </div>
 
       {artists.length === 0 ? (
         <p className="text-body-sm text-muted">No artists match this search.</p>
       ) : (
-        <div className="max-h-[32rem] space-y-1 overflow-y-auto pr-2 text-body text-muted">
+        <div className="max-h-[41rem] space-y-1 overflow-y-auto pr-2 text-sm text-muted">
           {artists.map((artist) => (
             <p key={artist}>{artist}</p>
           ))}

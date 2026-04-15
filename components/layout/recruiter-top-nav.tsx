@@ -77,10 +77,10 @@ export function RecruiterTopNav({
           </Link>
         </div>
 
-        <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-20">
+        <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-0">
           <nav
             aria-label="Recruiter navigation"
-            className="ml-3 flex items-center gap-7 text-subheading text-muted md:ml-0 md:gap-8"
+            className="ml-5 flex items-center gap-7 text-subheading text-muted md:ml-4 md:gap-8"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             {navItems.map((item) => (
