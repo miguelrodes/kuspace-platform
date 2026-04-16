@@ -409,6 +409,7 @@ function purchaseTicketSection({
           quantity,
           accessGroupId: section.accessGroupId,
           ticketLabel: section.name,
+          status: "active",
         })
       : candidate,
   );

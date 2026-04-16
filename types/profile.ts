@@ -1,6 +1,6 @@
 import type { Event } from "@/types/event";
 
-export type RecruiterProfileKind = "person" | "entity";
+export type RecruiterType = "nightclub" | "label";
 
 export type RecruiterProfileLinks = {
   instagram?: string;
@@ -61,7 +61,7 @@ export type RecruiterProfileMedia = {
 export interface RecruiterProfile {
   id: string;
   slug: string;
-  kind: RecruiterProfileKind;
+  recruiterType: RecruiterType;
 
   realName?: string;
   displayName: string;

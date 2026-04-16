@@ -36,7 +36,9 @@ export function PublicTopNav({
     {
       href: "/cons/profile/me",
       label: "Profile",
-      active: pathname === "/consprofile" || pathname.startsWith("/cons/profile"),
+      active:
+        pathname === "/consprofile" ||
+        pathname === "/cons/profile/me",
     },
   ];
 
@@ -45,17 +47,17 @@ export function PublicTopNav({
     router.push(href);
   };
 
-  const promoters = Array.from(
+  const labels = Array.from(
     new Map(
       events
-        .flatMap((event) => event.promoters ?? [])
-        .map((promoter) => [
-          promoter.id,
+        .flatMap((event) => event.labels ?? [])
+        .map((label) => [
+          label.id,
           {
-            id: promoter.id,
-            name: promoter.name,
-            avatarImageUrl: promoter.avatarImageUrl,
-            href: promoter.profileSlug ? `/cons/profile/${promoter.profileSlug}` : undefined,
+            id: label.id,
+            name: label.name,
+            avatarImageUrl: label.avatarImageUrl,
+            href: label.profileSlug ? `/cons/profile/${label.profileSlug}` : undefined,
           },
         ]),
     ).values(),
@@ -132,7 +134,7 @@ export function PublicTopNav({
             avatarImageUrl: profile.media?.avatarImageUrl,
           },
         ]}
-        promoters={promoters}
+        labels={labels}
         eventHrefFor={(event) => `/cons/events/${event.slug}`}
         nightclubHrefFor={(nightclub) => `/cons/profile/${nightclub.slug}`}
         onNavigate={handleNavigate}

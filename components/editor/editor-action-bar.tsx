@@ -1,7 +1,6 @@
 "use client";
 
 import type { EventStatus } from "@/types/event";
-import { Button } from "@/components/ui/button";
 
 type EditorActionBarProps = {
   status: EventStatus;
@@ -18,6 +17,9 @@ export function EditorActionBar({
   onLock,
   onRevertToDraft,
 }: EditorActionBarProps) {
+  const actionButtonClassName =
+    "relative z-10 inline-flex h-7 items-center justify-center whitespace-nowrap rounded-[var(--radius-button-tag)] border-0 bg-transparent px-2.5 text-body-sm uppercase tracking-[0.1em] leading-none outline-none transition";
+
   if (readOnly) {
     return (
       <p className="text-body-sm uppercase tracking-[0.08em] text-muted">
@@ -31,40 +33,50 @@ export function EditorActionBar({
   const isLive = status === "live";
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="relative z-10 flex flex-wrap items-center gap-3">
       {isDraft ? (
         <>
-          <Button
-            type="button"
-            variant="ghost"
-            className="!h-7 !px-2.5 text-body-sm uppercase tracking-[0.1em]"
-            style={{ color: "var(--accent-hex)" }}
-            onClick={onLock}
+          <a
+            href="#"
+            className={actionButtonClassName}
+            style={{
+              color: "var(--accent-hex)",
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              onLock();
+            }}
           >
             Lock Event
-          </Button>
+          </a>
         </>
       ) : null}
 
       {isUpcoming ? (
         <>
-          <Button
-            type="button"
-            variant="ghost"
-            className="!h-7 !px-2.5 text-body-sm uppercase tracking-[0.1em] text-muted hover:text-[hsl(var(--warning))]"
-            onClick={onRevertToDraft}
+          <a
+            href="#"
+            className={`${actionButtonClassName} text-muted hover:text-[hsl(var(--warning))]`}
+            onClick={(event) => {
+              event.preventDefault();
+              onRevertToDraft();
+            }}
           >
             Revert to Draft
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="!h-7 !px-2.5 text-body-sm uppercase tracking-[0.1em]"
-            style={{ color: "var(--accent-hex)" }}
-            onClick={onPublish}
+          </a>
+          <a
+            href="#"
+            className={actionButtonClassName}
+            style={{
+              color: "var(--accent-hex)",
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              onPublish();
+            }}
           >
             Publish
-          </Button>
+          </a>
         </>
       ) : null}
 

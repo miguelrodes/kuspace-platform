@@ -213,7 +213,7 @@ export type EventTicketsSection = {
   sections?: TicketSection[];
 };
 
-export type EventPromoter = {
+export type EventLabel = {
   id: string;
   name: string;
   profileSlug?: string;
@@ -237,7 +237,7 @@ export interface Event {
   applications: EventApplication[];
   budget: EventBudgetSection;
   tickets: EventTicketsSection;
-  promoters?: EventPromoter[];
+  labels?: EventLabel[];
 }
 
 export type EventSummaryCover = Pick<

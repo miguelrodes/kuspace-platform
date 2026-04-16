@@ -359,36 +359,6 @@ export function LineupTab({
     });
   };
 
-  const sortAlphabetically = () => {
-    onChange({
-      ...value,
-      selectedArtists: [...value.selectedArtists].sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
-    });
-  };
-
-  const groupedArtists = useMemo(() => {
-    const groups = [
-      {
-        id: "__unassigned__",
-        label: "Unassigned",
-        artists: value.selectedArtists.filter(
-          (artist) => normalizeRoomAssignment(value.roomAssignments[artist.id]).length === 0,
-        ),
-      },
-      ...roomOptions.map((room) => ({
-        id: room.id,
-        label: room.name,
-        artists: value.selectedArtists.filter((artist) =>
-          normalizeRoomAssignment(value.roomAssignments[artist.id]).includes(room.id),
-        ),
-      })),
-    ];
-
-    return groups.filter((group) => group.artists.length > 0 || group.id === "__unassigned__");
-  }, [roomOptions, value.roomAssignments, value.selectedArtists]);
-
   const roomGroups = useMemo(
     () =>
       roomOptions.map((room) => ({
@@ -419,7 +389,8 @@ export function LineupTab({
                         disabled: roomOptions.length === 0,
                       },
                     ]}
-                    className="h-7 justify-start gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80"
+                    className="h-7 w-[10.25rem] justify-end gap-1 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80"
+                    labelClassName="text-right"
                     optionClassName="text-body-sm uppercase tracking-widerish"
                     ariaLabel="Select lineup display mode"
                     onChange={(nextValue) =>
@@ -429,16 +400,6 @@ export function LineupTab({
                       })
                     }
                   />
-                  {value.displayMode === "event" && value.selectedArtists.length > 1 ? (
-                    <button
-                      type="button"
-                      className="text-body-sm uppercase tracking-widerish transition hover:opacity-80"
-                      style={{ color: "var(--accent-hex)" }}
-                      onClick={sortAlphabetically}
-                    >
-                      Sort A-Z
-                    </button>
-                  ) : null}
                 </div>
               }
             />

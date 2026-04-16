@@ -303,8 +303,8 @@ export function PublicEventDetailPage({
     );
   }
 
-  const promoters = event.promoters?.length
-    ? event.promoters
+  const labels = event.labels?.length
+    ? event.labels
     : [
         {
           id: recruiter.id,
@@ -552,44 +552,44 @@ export function PublicEventDetailPage({
 	                </div>
 
 	                <div className="space-y-1 pt-1">
-	                  <p className="text-body-lg uppercase tracking-widerish text-[#FFFFFF]">Promoters</p>
+	                  <p className="text-body-lg uppercase tracking-widerish text-[#FFFFFF]">Labels</p>
                     <div
                       className={
-                        promoters.length > 3
+                        labels.length > 3
                           ? "grid gap-3 sm:grid-cols-2"
                           : "flex flex-col gap-2"
                       }
                     >
-                      {promoters.map((promoter) =>
-                        promoter.profileSlug ? (
+                      {labels.map((label) =>
+                        label.profileSlug ? (
                           <Link
-                            key={promoter.id}
+                            key={label.id}
                             href={
                               audience === "recruiter"
-                                ? `/recprofile/${promoter.profileSlug}`
-                                : `/cons/profile/${promoter.profileSlug}`
+                                ? `/recprofile/${label.profileSlug}`
+                                : `/cons/profile/${label.profileSlug}`
                             }
                             className="inline-flex items-center gap-2 text-body text-fg transition hover:text-[var(--accent-hex)]"
                           >
                             <span className="h-6 w-6 overflow-hidden rounded-full border border-border bg-panel">
-                              {promoter.avatarImageUrl ? (
+                              {label.avatarImageUrl ? (
                                 <span
                                   className="block h-full w-full bg-cover bg-center"
                                   style={{
-                                    backgroundImage: `url(${promoter.avatarImageUrl})`,
+                                    backgroundImage: `url(${label.avatarImageUrl})`,
                                   }}
                                 />
                               ) : null}
                             </span>
-                            <span>{promoter.name}</span>
+                            <span>{label.name}</span>
                           </Link>
                         ) : (
                           <span
-                            key={promoter.id}
+                            key={label.id}
                             className="inline-flex items-center gap-2 text-body text-fg"
                           >
                             <span className="h-6 w-6 rounded-full border border-border bg-panel" />
-                            <span>{promoter.name}</span>
+                            <span>{label.name}</span>
                           </span>
                         ),
                       )}

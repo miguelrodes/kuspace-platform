@@ -11,7 +11,7 @@ type SearchNightclub = {
   avatarImageUrl?: string;
 };
 
-type SearchPromoter = {
+type SearchLabel = {
   id: string;
   name: string;
   avatarImageUrl?: string;
@@ -23,7 +23,7 @@ type GlobalSearchOverlayProps = {
   onClose: () => void;
   events: Event[];
   nightclubs: SearchNightclub[];
-  promoters: SearchPromoter[];
+  labels: SearchLabel[];
   eventHrefFor: (event: Event) => string;
   nightclubHrefFor: (nightclub: SearchNightclub) => string;
   onNavigate: (href: string) => void;
@@ -73,7 +73,7 @@ export function GlobalSearchOverlay({
   onClose,
   events,
   nightclubs,
-  promoters,
+  labels,
   eventHrefFor,
   nightclubHrefFor,
   onNavigate,
@@ -103,12 +103,14 @@ export function GlobalSearchOverlay({
         events: [] as Array<{
           id: string;
           title: string;
+          dateLabel: string;
           subtitle: string;
           href: string;
         }>,
         pastEvents: [] as Array<{
           id: string;
           title: string;
+          dateLabel: string;
           subtitle: string;
           href: string;
         }>,
@@ -118,7 +120,7 @@ export function GlobalSearchOverlay({
           avatarImageUrl?: string;
           href: string;
         }>,
-        promoters: [] as Array<{
+        labels: [] as Array<{
           id: string;
           name: string;
           avatarImageUrl?: string;
@@ -133,12 +135,12 @@ export function GlobalSearchOverlay({
         const titleScore = scoreMatch(normalizedQuery, [event.cover.title]);
         const venueScore = scoreMatch(normalizedQuery, [event.cover.venue, event.cover.location]);
         const genreScore = scoreMatch(normalizedQuery, event.cover.genres);
-        const promoterScore = scoreMatch(
+        const labelScore = scoreMatch(
           normalizedQuery,
-          (event.promoters ?? []).map((promoter) => promoter.name),
+          (event.labels ?? []).map((label) => label.name),
         );
         const lineupScore = scoreMatch(normalizedQuery, lineupNames);
-        const score = Math.max(titleScore, venueScore, genreScore, promoterScore, lineupScore);
+        const score = Math.max(titleScore, venueScore, genreScore, labelScore, lineupScore);
 
         if (score < 0) {
           return null;
@@ -146,12 +148,12 @@ export function GlobalSearchOverlay({
 
         const dateLabel = formatEventSearchDate(event.cover.date);
         const lineupLabel = lineupNames.join(", ");
-        const subtitle = [lineupLabel, dateLabel].filter(Boolean).join(" • ");
 
         return {
           id: event.id,
           title: event.cover.title,
-          subtitle,
+          dateLabel,
+          subtitle: lineupLabel,
           href: eventHrefFor(event),
           status: event.status,
           score,
@@ -172,6 +174,7 @@ export function GlobalSearchOverlay({
       .map((event) => ({
         id: event!.id,
         title: event!.title,
+        dateLabel: event!.dateLabel,
         subtitle: event!.subtitle,
         href: event!.href,
       }));
@@ -182,6 +185,7 @@ export function GlobalSearchOverlay({
       .map((event) => ({
         id: event!.id,
         title: event!.title,
+        dateLabel: event!.dateLabel,
         subtitle: event!.subtitle,
         href: event!.href,
       }));
@@ -217,18 +221,18 @@ export function GlobalSearchOverlay({
         href: nightclub!.href,
       }));
 
-    const promoterResults = promoters
-      .map((promoter) => {
-        const score = scoreMatch(normalizedQuery, [promoter.name]);
+    const labelResults = labels
+      .map((label) => {
+        const score = scoreMatch(normalizedQuery, [label.name]);
         if (score < 0) {
           return null;
         }
 
         return {
-          id: promoter.id,
-          name: promoter.name,
-          avatarImageUrl: promoter.avatarImageUrl,
-          href: promoter.href,
+          id: label.id,
+          name: label.name,
+          avatarImageUrl: label.avatarImageUrl,
+          href: label.href,
           score,
         };
       })
@@ -241,20 +245,20 @@ export function GlobalSearchOverlay({
         return left!.name.localeCompare(right!.name);
       })
       .slice(0, 8)
-      .map((promoter) => ({
-        id: promoter!.id,
-        name: promoter!.name,
-        avatarImageUrl: promoter!.avatarImageUrl,
-        href: promoter!.href,
+      .map((label) => ({
+        id: label!.id,
+        name: label!.name,
+        avatarImageUrl: label!.avatarImageUrl,
+        href: label!.href,
       }));
 
     return {
       events: eventResults,
       pastEvents: pastEventResults,
       nightclubs: nightclubResults,
-      promoters: promoterResults,
+      labels: labelResults,
     };
-  }, [eventHrefFor, events, nightclubHrefFor, nightclubs, promoters, query]);
+  }, [eventHrefFor, events, nightclubHrefFor, nightclubs, labels, query]);
 
   if (!open) {
     return null;
@@ -272,9 +276,8 @@ export function GlobalSearchOverlay({
     .map((event) => ({
       id: event.id,
       title: event.cover.title,
-      subtitle: [event.lineup.entries.map((entry) => entry.name).join(", "), formatEventSearchDate(event.cover.date)]
-        .filter(Boolean)
-        .join(" • "),
+      dateLabel: formatEventSearchDate(event.cover.date),
+      subtitle: event.lineup.entries.map((entry) => entry.name).join(", "),
       href: eventHrefFor(event),
     }));
 
@@ -285,9 +288,8 @@ export function GlobalSearchOverlay({
     .map((event) => ({
       id: event.id,
       title: event.cover.title,
-      subtitle: [event.lineup.entries.map((entry) => entry.name).join(", "), formatEventSearchDate(event.cover.date)]
-        .filter(Boolean)
-        .join(" • "),
+      dateLabel: formatEventSearchDate(event.cover.date),
+      subtitle: event.lineup.entries.map((entry) => entry.name).join(", "),
       href: eventHrefFor(event),
     }));
 
@@ -298,14 +300,14 @@ export function GlobalSearchOverlay({
     href: nightclubHrefFor(nightclub),
   }));
 
-  const defaultPromoters = [...promoters]
+  const defaultLabels = [...labels]
     .sort((left, right) => left.name.localeCompare(right.name))
     .slice(0, 8);
 
   const displayEvents = query.trim().length === 0 ? defaultEvents : results.events;
   const displayPastEvents = query.trim().length === 0 ? defaultPastEvents : results.pastEvents;
   const displayNightclubs = query.trim().length === 0 ? defaultNightclubs : results.nightclubs;
-  const displayPromoters = query.trim().length === 0 ? defaultPromoters : results.promoters;
+  const displayLabels = query.trim().length === 0 ? defaultLabels : results.labels;
 
   return (
     <div className="fixed inset-0 z-40 bg-black/60 px-4 py-4 md:px-6 md:py-6" onClick={handleClose}>
@@ -336,7 +338,7 @@ export function GlobalSearchOverlay({
           displayEvents.length === 0 &&
           displayPastEvents.length === 0 &&
           displayNightclubs.length === 0 &&
-          displayPromoters.length === 0 ? (
+          displayLabels.length === 0 ? (
             <p className="text-body text-muted">No results found.</p>
           ) : (
             <div className="space-y-8">
@@ -355,7 +357,11 @@ export function GlobalSearchOverlay({
                         className="block w-full rounded-[var(--radius-button-tag)] border border-transparent px-3 py-2 text-left transition hover:border-border hover:bg-panel-2"
                       >
                         <div className="truncate text-body text-fg">{result.title}</div>
-                        <div className="truncate text-body-sm text-muted">{result.subtitle}</div>
+                        <div className="flex items-baseline gap-1.5 text-body-sm text-muted">
+                          <div className="shrink-0">{result.dateLabel}</div>
+                          <div className="shrink-0 text-white/50">|</div>
+                          <div className="truncate">{result.subtitle}</div>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -396,10 +402,10 @@ export function GlobalSearchOverlay({
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-body-sm uppercase tracking-widerish text-[var(--accent-hex)]">Promoters</h3>
-                {displayPromoters.length > 0 ? (
+                <h3 className="text-body-sm uppercase tracking-widerish text-[var(--accent-hex)]">Labels</h3>
+                {displayLabels.length > 0 ? (
                   <div className="space-y-1.5">
-                    {displayPromoters.map((result) => {
+                    {displayLabels.map((result) => {
                       const content = (
                         <>
                           <span className="h-9 w-9 overflow-hidden rounded-full border border-border bg-panel">
@@ -439,7 +445,7 @@ export function GlobalSearchOverlay({
                     })}
                   </div>
                 ) : (
-                  <p className="text-body-sm text-muted">No matching promoters.</p>
+                  <p className="text-body-sm text-muted">No matching labels.</p>
                 )}
               </section>
 
@@ -458,7 +464,11 @@ export function GlobalSearchOverlay({
                         className="block w-full rounded-[var(--radius-button-tag)] border border-transparent px-3 py-2 text-left transition hover:border-border hover:bg-panel-2"
                       >
                         <div className="truncate text-body text-fg">{result.title}</div>
-                        <div className="truncate text-body-sm text-muted">{result.subtitle}</div>
+                        <div className="flex items-baseline gap-1.5 text-body-sm text-muted">
+                          <div className="shrink-0">{result.dateLabel}</div>
+                          <div className="shrink-0 text-white/50">|</div>
+                          <div className="truncate">{result.subtitle}</div>
+                        </div>
                       </button>
                     ))}
                   </div>

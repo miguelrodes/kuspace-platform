@@ -10,7 +10,7 @@ import { useMockEventsStore } from "@/lib/mock-store";
 import { EventEditorHeader } from "@/components/editor/event-editor-header";
 import { EditorTabNav } from "@/components/editor/editor-tab-nav";
 import { EditorActionBar } from "@/components/editor/editor-action-bar";
-import { ConfirmDialog, DIALOG_ACTION_CLASS, DIALOG_TITLE_CLASS } from "@/components/ui/action-dialog";
+import { ConfirmDialog } from "@/components/ui/action-dialog";
 import {
   CoverTab,
   type CoverFormState,
@@ -45,7 +45,6 @@ import type {
   ArtistProfile,
   EventAccessAssignment,
   EventApplication,
-  LineupEntry,
 } from "@/types/event";
 import type { ConsumerUser } from "@/types/user";
 
@@ -742,6 +741,7 @@ export function EventEditorShell(props: EventEditorShellProps) {
   const [timetableRowErrors, setTimetableRowErrors] = useState<Record<string, TimetableRowErrors>>({});
   const [hasPendingAutosave, setHasPendingAutosave] = useState(false);
   const [showCoverEditWarning, setShowCoverEditWarning] = useState(false);
+  const [showPublishWarning, setShowPublishWarning] = useState(false);
   const [pendingCoverValue, setPendingCoverValue] = useState<CoverFormState | null>(null);
   const [hasAcknowledgedCoverEditWarning, setHasAcknowledgedCoverEditWarning] = useState(false);
   const hasMountedRef = useRef(false);
@@ -947,6 +947,14 @@ export function EventEditorShell(props: EventEditorShellProps) {
     ],
   );
 
+  const handlePublishRequest = useCallback(() => {
+    if (isReadOnly) {
+      return;
+    }
+
+    setShowPublishWarning(true);
+  }, [isReadOnly]);
+
   useEffect(() => {
     if (!hasMountedRef.current) {
       hasMountedRef.current = true;
@@ -1000,7 +1008,7 @@ export function EventEditorShell(props: EventEditorShellProps) {
             <EditorActionBar
               status={localStatus}
               readOnly={isReadOnly}
-              onPublish={() => persistEditorDraft("live")}
+              onPublish={handlePublishRequest}
               onLock={handleLockEvent}
               onRevertToDraft={() => persistEditorDraft("draft")}
             />
@@ -1132,6 +1140,23 @@ export function EventEditorShell(props: EventEditorShellProps) {
             setHasAcknowledgedCoverEditWarning(true);
             setPendingCoverValue(null);
             setShowCoverEditWarning(false);
+          }}
+        />
+      ) : null}
+
+      {showPublishWarning ? (
+        <ConfirmDialog
+          title="Publish Event"
+          message="This will make the event public and visible to users. Are you sure you want to publish it?"
+          confirmLabel="Publish"
+          confirmTone="accent"
+          hideClose
+          titleColor="#FFFFFF"
+          confirmButtonClassName="text-[var(--accent-hex)]"
+          onClose={() => setShowPublishWarning(false)}
+          onConfirm={() => {
+            setShowPublishWarning(false);
+            persistEditorDraft("live");
           }}
         />
       ) : null}

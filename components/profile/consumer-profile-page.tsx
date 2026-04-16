@@ -358,7 +358,7 @@ function ArtistsSeenContent({
           {artists.length === 0 ? "No artists tracked yet." : "No artists match this search."}
         </p>
       ) : (
-        <div className="max-h-[25.5rem] w-full space-y-1 overflow-y-auto text-body text-muted">
+        <div className="max-h-[23.75rem] w-full space-y-1 overflow-y-auto text-body text-muted">
           {filteredArtists.map((artist) => (
             <p key={artist} className="truncate">
               {artist}
@@ -729,7 +729,16 @@ export function ConsumerProfilePageView() {
                     <EventLibraryContent events={activeEvents} />
                   </div>
 
-                  <div className="xl:self-stretch xl:ml-6 xl:border-l xl:border-border xl:pl-6">
+                  <div
+                    className="xl:self-stretch xl:ml-10 xl:pl-10"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(hsl(var(--border)), hsl(var(--border)))",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "left 0 top 2.6rem",
+                      backgroundSize: "1px calc(100% - 2.6rem)",
+                    }}
+                  >
                     <div className="space-y-3 xl:w-fit">
                       <h2
                         className="relative top-[7px] text-left text-body-lg uppercase tracking-[0.01em]"

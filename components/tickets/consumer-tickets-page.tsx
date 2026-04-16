@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
 import { Button } from "@/components/ui/button";
-import { getEventAccessAssignment, isQrActiveForAssignment } from "@/lib/event-access";
+import {
+  getConsumerTicketStatus,
+  getEventAccessAssignment,
+} from "@/lib/event-access";
 import { canConsumerAccessEvent } from "@/lib/event-status";
 import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
 import { formatFullEventDate } from "@/lib/utils/date";
-import type { ConsumerTicketWalletEntry } from "@/types/user";
+import type { ConsumerTicketStatus, ConsumerTicketWalletEntry } from "@/types/user";
 
 type TicketSection = "upcoming" | "past";
 
@@ -22,6 +25,22 @@ function formatPaymentStateLabel(paymentState: "not_required" | "pending" | "pai
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatTicketStatusLabel(status: ConsumerTicketStatus) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function getTicketStatusTone(status: ConsumerTicketStatus) {
+  switch (status) {
+    case "active":
+      return "text-fg";
+    case "scanned":
+      return "text-muted";
+    case "inactive":
+    default:
+      return "text-muted";
+  }
 }
 
 function TicketDetailModal({
@@ -41,7 +60,7 @@ function TicketDetailModal({
     groupName: string;
     ticketLabel?: string;
     paymentState: "not_required" | "pending" | "paid" | "waived";
-    qrActive: boolean;
+    status: ConsumerTicketStatus;
   }>;
   onClose: () => void;
 }) {
@@ -108,7 +127,7 @@ function TicketDetailModal({
                     </div>
 
                     <div className="pt-4">
-                      {ticket.qrActive ? (
+                      {ticket.status === "active" ? (
                         <div className="mx-auto aspect-square w-full max-w-[18rem] rounded-[var(--radius-button-tag)] bg-white p-3">
                           <div className="grid h-full w-full grid-cols-[repeat(21,minmax(0,1fr))] gap-px bg-white">
                             {qrPattern(qrIndexSeed).map((dark, qrIndex) => (
@@ -117,6 +136,15 @@ function TicketDetailModal({
                                 className={dark ? "bg-black" : "bg-white"}
                               />
                             ))}
+                          </div>
+                        </div>
+                      ) : ticket.status === "scanned" ? (
+                        <div className="mx-auto flex aspect-square w-full max-w-[18rem] items-center justify-center rounded-[var(--radius-button-tag)] border border-border bg-panel px-6 text-center">
+                          <div className="space-y-2">
+                            <p className="text-body text-fg">Ticket scanned</p>
+                            <p className="text-body-sm text-muted">
+                              This ticket has already been used and can no longer be scanned.
+                            </p>
                           </div>
                         </div>
                       ) : (
@@ -131,9 +159,11 @@ function TicketDetailModal({
                       )}
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <p className="text-body-sm uppercase tracking-widerish text-muted">
-                          {ticket.qrActive
-                            ? `Mock QR • ${ticket.groupName}`
-                            : `Payment ${formatPaymentStateLabel(ticket.paymentState)}`}
+                          {ticket.status === "active"
+                            ? `Active • ${ticket.groupName}`
+                            : ticket.status === "scanned"
+                              ? `Scanned • ${ticket.groupName}`
+                              : `Inactive • Payment ${formatPaymentStateLabel(ticket.paymentState)}`}
                         </p>
                         <Link
                           href={`/cons/events/${eventSlug}`}
@@ -159,13 +189,13 @@ function TicketEventRow({
   quantity,
   event,
   paymentState,
-  qrActive,
+  status,
   onViewTicket,
 }: {
   quantity: number;
   event: ReturnType<typeof useMockEventsStore>["events"][number];
   paymentState: "not_required" | "pending" | "paid" | "waived";
-  qrActive: boolean;
+  status: ConsumerTicketStatus;
   onViewTicket: () => void;
 }) {
   const isPast = event.status === "past";
@@ -200,8 +230,10 @@ function TicketEventRow({
           >
             {quantity}
           </span>
-          <span className={`text-body-sm ${qrActive ? "text-fg" : "text-muted"}`}>
-            {qrActive ? "QR Active" : `Payment ${formatPaymentStateLabel(paymentState)}`}
+          <span className={`text-body-sm ${getTicketStatusTone(status)}`}>
+            {status === "inactive"
+              ? `Inactive • Payment ${formatPaymentStateLabel(paymentState)}`
+              : formatTicketStatusLabel(status)}
           </span>
           </div>
         </div>
@@ -253,8 +285,10 @@ function TicketEventRow({
             >
               {quantity}
             </span>
-            <span className={`text-body-sm ${qrActive ? "text-fg" : "text-muted"}`}>
-              {qrActive ? "QR Active" : `Payment ${formatPaymentStateLabel(paymentState)}`}
+            <span className={`text-body-sm ${getTicketStatusTone(status)}`}>
+              {status === "inactive"
+                ? `Inactive • Payment ${formatPaymentStateLabel(paymentState)}`
+                : formatTicketStatusLabel(status)}
             </span>
           </div>
           <Button
@@ -282,7 +316,7 @@ function TicketSectionBlock({
     event: ReturnType<typeof useMockEventsStore>["events"][number];
     groupName: string;
     paymentState: "not_required" | "pending" | "paid" | "waived";
-    qrActive: boolean;
+    status: ConsumerTicketStatus;
   }>;
   onViewTicket: (eventSlug: string) => void;
   sortDirection: "asc" | "desc";
@@ -293,7 +327,13 @@ function TicketSectionBlock({
 
       if (existing) {
         existing.quantity += entry.entry.quantity;
-        existing.qrActive = existing.qrActive || entry.qrActive;
+        if (entry.status === "active" || existing.status === "active") {
+          existing.status = "active";
+        } else if (entry.status === "inactive" || existing.status === "inactive") {
+          existing.status = "inactive";
+        } else {
+          existing.status = "scanned";
+        }
         return groups;
       }
 
@@ -301,7 +341,7 @@ function TicketSectionBlock({
         event: entry.event,
         quantity: entry.entry.quantity,
         paymentState: entry.paymentState,
-        qrActive: entry.qrActive,
+        status: entry.status,
       });
 
       return groups;
@@ -309,7 +349,7 @@ function TicketSectionBlock({
       event: ReturnType<typeof useMockEventsStore>["events"][number];
       quantity: number;
       paymentState: "not_required" | "pending" | "paid" | "waived";
-      qrActive: boolean;
+      status: ConsumerTicketStatus;
     }>()).values(),
   );
 
@@ -342,13 +382,13 @@ function TicketSectionBlock({
         </div>
       ) : (
         <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-4">
-          {sortedEntries.map(({ event, quantity, paymentState, qrActive }) => (
+          {sortedEntries.map(({ event, quantity, paymentState, status }) => (
             <TicketEventRow
               key={event.slug}
               quantity={quantity}
               event={event}
               paymentState={paymentState}
-              qrActive={qrActive}
+              status={status}
               onViewTicket={() => onViewTicket(event.slug)}
             />
           ))}
@@ -391,7 +431,10 @@ export function ConsumerTicketsPage() {
             event,
             groupName,
             paymentState: assignment?.paymentState ?? "pending",
-            qrActive: isQrActiveForAssignment(assignment),
+            status: getConsumerTicketStatus({
+              walletStatus: entry.status,
+              assignment,
+            }),
           };
         })
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
@@ -491,7 +534,7 @@ export function ConsumerTicketsPage() {
             groupName: card.groupName,
             ticketLabel: card.entry.ticketLabel,
             paymentState: card.paymentState,
-            qrActive: card.qrActive,
+            status: card.status,
           }))}
           onClose={() => setSelectedEntrySlug(null)}
         />

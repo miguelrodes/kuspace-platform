@@ -62,12 +62,12 @@ function formatTimeRange(row: TimetableRowDraft) {
   return `${start} - ${end}`;
 }
 
-function createEmptyRow(): TimetableRowDraft {
+function createEmptyRow(initialRoom = ""): TimetableRowDraft {
   return {
     id: `timetable-row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     title: "",
     lineupEntryId: "",
-    room: "",
+    room: initialRoom,
     notes: "",
     startTime: "",
     endTime: "",
@@ -93,15 +93,17 @@ function updateRow(
 function AddTimetableRowModal({
   lineupOptions,
   roomOptions,
+  initialRoom,
   onClose,
   onConfirm,
 }: {
   lineupOptions: Array<{ value: string; label: string }>;
   roomOptions: Array<{ value: string; label: string }>;
+  initialRoom?: string;
   onClose: () => void;
   onConfirm: (draft: TimetableRowDraft) => void;
 }) {
-  const [draft, setDraft] = useState<TimetableRowDraft>(() => createEmptyRow());
+  const [draft, setDraft] = useState<TimetableRowDraft>(() => createEmptyRow(initialRoom));
 
   const isValid =
     draft.title.trim().length > 0 &&
@@ -251,6 +253,7 @@ export function TimetableTab({
   onChange,
 }: TimetableTabProps) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addRowRoom, setAddRowRoom] = useState<string>("");
   const lineupOptions = [
     { value: "", label: "No DJ" },
     ...lineupArtists.map((artist) => ({ value: artist.id, label: artist.name })),
@@ -277,8 +280,13 @@ export function TimetableTab({
     acc.set(roomName, existing);
     return acc;
   }, new Map());
-  const sortedRoomSections = Array.from(groupedRows.entries()).sort(
-    ([leftRoom], [rightRoom]) => {
+  const sortedRoomSections = Array.from(
+    new Set([
+      ...roomOptions.map((room) => room.name),
+      ...Array.from(groupedRows.keys()),
+    ]),
+  )
+    .sort((leftRoom, rightRoom) => {
       const leftOrder =
         leftRoom === "Unassigned"
           ? Number.MAX_SAFE_INTEGER
@@ -293,8 +301,8 @@ export function TimetableTab({
       }
 
       return leftRoom.localeCompare(rightRoom);
-    },
-  );
+    })
+    .map((roomName) => [roomName, groupedRows.get(roomName) ?? []] as const);
 
   const handlePrint = () => {
     const lineupNameById = new Map(
@@ -535,15 +543,15 @@ export function TimetableTab({
   return (
     <>
       <section className="rounded-[var(--radius-surface)] border border-border bg-panel p-5">
-      <div className="space-y-3">
-        <div className="space-y-3">
+      <div className="space-y-6">
+        <div className="space-y-4">
           <EditorSectionHeader
             title="Timetable"
             actions={
               <Button
                 type="button"
                 variant="ghost"
-                className="h-6 px-2.5 text-body-sm uppercase tracking-[0.1em]"
+                className="h-6 pl-2.5 pr-0 text-body-sm uppercase tracking-[0.1em]"
                 style={{ color: "var(--accent-hex)" }}
                 onClick={handlePrint}
               >
@@ -582,27 +590,17 @@ export function TimetableTab({
                 }
               />
             </div>
-            <div className="flex items-start justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 px-4 text-body-sm uppercase tracking-[0.12em]"
-                style={{ color: "var(--accent-hex)" }}
-                onClick={() => setShowAddModal(true)}
-              >
-                Add Row
-              </Button>
-            </div>
+            <div />
           </div>
         </div>
 
-        <div className="space-y-1">
-          {value.rows.length === 0 ? (
+        <div className="space-y-3">
+          {sortedRoomSections.length === 0 ? (
             <div className="rounded-[var(--radius-surface)] border border-dashed border-border bg-panel px-4 py-4 text-body-sm text-muted">
-              No schedule rows yet. Add the first row to build the event run-of-show.
+              No rooms or schedule rows yet. Add rooms in Cover first to build the timetable by room.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-[3rem]">
               {sortedRoomSections.map(([roomName, roomRows]) => {
                 const sortedRows = [...roomRows].sort((left, right) => {
                   const endComparison = normalizeTimeValue(left.endTime).localeCompare(
@@ -619,19 +617,52 @@ export function TimetableTab({
                 });
 
                 return (
-                  <div key={roomName} className="space-y-3">
-                    <p className="text-body uppercase tracking-widerish text-[var(--accent-hex)]">
-                      {roomName}
-                    </p>
-                    {sortedRows.map((row) => {
+                  <div key={roomName} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-['Space_Grotesk'] text-body-lg uppercase tracking-widerish text-[#FFFFFF]">
+                        {roomName}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8 pl-4 pr-1 text-body-sm uppercase tracking-[0.12em]"
+                        style={{ color: "var(--accent-hex)" }}
+                        onClick={() => {
+                          setAddRowRoom(roomName === "Unassigned" ? "" : roomName);
+                          setShowAddModal(true);
+                        }}
+                      >
+                        Add Row
+                      </Button>
+                    </div>
+                    {sortedRows.length === 0 ? (
+                      <div className="rounded-[var(--radius-surface)] border border-dashed border-border bg-panel px-4 py-4 text-body-sm text-muted">
+                        No rows in this room yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedRows.map((row) => {
                       const errors = rowErrors[row.id] ?? {};
 
                       return (
                         <div
                           key={row.id}
-                          className="rounded-[var(--radius-surface)] border border-border bg-panel p-4"
+                          className="relative rounded-[var(--radius-surface)] border border-border bg-panel p-4"
                         >
-                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_8.5rem_8.5rem_minmax(0,0.9fr)_auto]">
+                          <button
+                            type="button"
+                            aria-label="Delete timetable row"
+                            className="absolute right-3 top-2 text-body-lg uppercase leading-none text-[var(--accent-hex)] transition hover:opacity-80"
+                            onClick={() =>
+                              onChange({
+                                ...value,
+                                rows: value.rows.filter((item) => item.id !== row.id),
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_8.5rem_8.5rem_minmax(0,0.9fr)]">
                       <div>
                         <label className="text-body uppercase tracking-widerish text-fg">
                           Title
@@ -742,21 +773,6 @@ export function TimetableTab({
                         />
                       </div>
 
-                      <div className="flex items-end justify-end gap-2">
-                        <button
-                          type="button"
-                          className="text-body-sm uppercase tracking-widerish transition hover:opacity-80"
-                          style={{ color: "var(--accent-hex)" }}
-                          onClick={() =>
-                            onChange({
-                              ...value,
-                              rows: value.rows.filter((item) => item.id !== row.id),
-                            })
-                          }
-                        >
-                          Delete
-                        </button>
-                      </div>
                     </div>
 
                           <div className="mt-4">
@@ -778,6 +794,8 @@ export function TimetableTab({
                         </div>
                       );
                     })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -790,12 +808,14 @@ export function TimetableTab({
         <AddTimetableRowModal
           lineupOptions={lineupOptions}
           roomOptions={roomDropdownOptions}
+          initialRoom={addRowRoom}
           onClose={() => setShowAddModal(false)}
           onConfirm={(draft) => {
             onChange({
               ...value,
               rows: [...value.rows, draft],
             });
+            setAddRowRoom("");
             setShowAddModal(false);
           }}
         />

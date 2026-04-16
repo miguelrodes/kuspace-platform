@@ -45,17 +45,17 @@ export function RecruiterTopNav({
     router.push(href);
   };
 
-  const promoters = Array.from(
+  const labels = Array.from(
     new Map(
       events
-        .flatMap((event) => event.promoters ?? [])
-        .map((promoter) => [
-          promoter.id,
+        .flatMap((event) => event.labels ?? [])
+        .map((label) => [
+          label.id,
           {
-            id: promoter.id,
-            name: promoter.name,
-            avatarImageUrl: promoter.avatarImageUrl,
-            href: promoter.profileSlug ? `/recprofile/${promoter.profileSlug}` : undefined,
+            id: label.id,
+            name: label.name,
+            avatarImageUrl: label.avatarImageUrl,
+            href: label.profileSlug ? `/recprofile/${label.profileSlug}` : undefined,
           },
         ]),
     ).values(),
@@ -132,7 +132,7 @@ export function RecruiterTopNav({
             avatarImageUrl: profile.media?.avatarImageUrl,
           },
         ]}
-        promoters={promoters}
+        labels={labels}
         eventHrefFor={(event) => `/rec/events/${event.slug}`}
         nightclubHrefFor={(nightclub) => `/recprofile/${nightclub.slug}`}
         onNavigate={handleNavigate}

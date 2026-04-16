@@ -51,14 +51,31 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 });
 
 function formatCurrency(value: number) {
-  return currencyFormatter
-    .format(Number.isFinite(value) ? value : 0)
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const absoluteValue = currencyFormatter
+    .format(Math.abs(safeValue))
     .replace("€", "€ ");
+
+  return safeValue < 0 ? absoluteValue.replace("€ ", "€ -") : absoluteValue;
 }
 
 function parseAmount(value: string) {
-  const parsed = Number(value);
+  const parsed = Number(value.replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatNumberInput(value: string) {
+  const sanitized = value.replace(/[^\d.]/g, "");
+  const [integerPartRaw = "", ...decimalParts] = sanitized.split(".");
+  const integerPart = integerPartRaw.replace(/^0+(?=\d)/, "");
+  const groupedInteger = (integerPart || "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const decimalPart = decimalParts.join("");
+
+  if (sanitized.includes(".")) {
+    return `${groupedInteger}.${decimalPart}`;
+  }
+
+  return integerPartRaw === "" ? "" : groupedInteger;
 }
 
 function StatusPill({
@@ -73,7 +90,7 @@ function StatusPill({
   return (
     <button
       type="button"
-      className={`inline-flex h-7 w-[5.75rem] items-center justify-center rounded-[var(--radius-surface)] border px-2 text-body-sm uppercase tracking-[0.06em] transition ${
+      className={`inline-flex h-7 w-[5.75rem] items-center justify-center rounded-[var(--radius-surface)] border px-2 text-sm uppercase tracking-[0.06em] transition ${
         paid
           ? "border-border text-[#FFFFFF]"
           : "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
@@ -202,7 +219,7 @@ function AddExpenseModal({
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
-                    amount: event.target.value,
+                    amount: formatNumberInput(event.target.value),
                   }))
                 }
               />
@@ -355,7 +372,7 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
             <Button
               type="button"
               variant="ghost"
-              className="h-8 px-4 text-body-sm uppercase tracking-[0.12em]"
+              className="h-8 pl-4 pr-0 text-body-sm uppercase tracking-[0.12em]"
               style={{ color: "var(--accent-hex)" }}
               onClick={() => setShowAddModal(true)}
             >
@@ -366,25 +383,25 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
         />
 
         <div className="grid gap-3 md:grid-cols-5">
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-3">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Budget Remaining</p>
-            <p className="mt-1 text-body-lg text-fg">{formatCurrency(metrics.budgetRemaining)}</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.budgetRemaining)}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-3">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Total Costs</p>
-            <p className="mt-1 text-body-lg text-fg">{formatCurrency(metrics.totalCosts)}</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.totalCosts)}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-3">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Paid</p>
-            <p className="mt-1 text-body-lg text-fg">{formatCurrency(metrics.paid)}</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.paid)}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-3">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Unpaid</p>
-            <p className="mt-1 text-body-lg text-fg">{formatCurrency(metrics.unpaid)}</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.unpaid)}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-3">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Revenue</p>
-            <p className="mt-1 text-body-lg text-fg">{formatCurrency(ticketRevenue)}</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(ticketRevenue)}</p>
           </div>
         </div>
 
@@ -399,11 +416,12 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
                 value={value.budgetCap}
                 inputMode="decimal"
                 placeholder="0"
-                className="border-border bg-panel pl-7 text-body text-white/72"
+                className="!h-7 border-border bg-panel py-0 pl-7 text-body text-white/72"
+                style={{ height: "1.875rem", minHeight: "1.875rem", maxHeight: "1.875rem" }}
                 onChange={(event) =>
                   onChange({
                     ...value,
-                    budgetCap: event.target.value,
+                    budgetCap: formatNumberInput(event.target.value),
                   })
                 }
               />
@@ -412,20 +430,33 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
 
           <div>
             <label className="text-body uppercase tracking-widerish text-fg">Net</label>
-            <div className="mt-1 rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5 text-body text-fg">
+            <div
+              className="mt-1 flex items-center rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-0 text-body text-fg"
+              style={{ height: "1.875rem", minHeight: "1.875rem", maxHeight: "1.875rem" }}
+            >
               {formatCurrency(metrics.net)}
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel">
-          <div className="grid gap-2 border-b border-border px-4 py-3 text-body-sm uppercase tracking-widerish text-muted md:grid-cols-[10rem_minmax(0,1.2fr)_6.25rem_7.25rem_minmax(0,1fr)_auto]">
-            <p>Category</p>
-            <p>Title</p>
-            <p>Status</p>
-            <p>Amount</p>
-            <p>Notes</p>
-            <p className="text-right">Action</p>
+        <div className="overflow-visible rounded-[var(--radius-surface)] border border-border bg-panel">
+          <div className="grid gap-2 border-b border-border px-4 py-3 text-body-sm uppercase tracking-widerish text-muted md:grid-cols-[8.75rem_minmax(0,1.35fr)_5.75rem_6.75rem_minmax(0,3.05fr)_1rem]">
+            <div className="flex h-7 items-center">
+              <p>Category</p>
+            </div>
+            <div className="flex h-7 items-center">
+              <p>Title</p>
+            </div>
+            <div className="flex h-7 items-center">
+              <p>Status</p>
+            </div>
+            <div className="flex h-7 items-center">
+              <p>Amount</p>
+            </div>
+            <div className="flex h-7 items-center">
+              <p>Notes</p>
+            </div>
+            <div />
           </div>
 
           {value.items.length === 0 ? (
@@ -437,7 +468,7 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
               {value.items.map((item) => (
                 <div
                   key={item.id}
-                  className={`grid gap-2 px-4 py-3 md:grid-cols-[10rem_minmax(0,1.2fr)_6.25rem_7.25rem_minmax(0,1fr)_auto] ${
+                  className={`grid gap-2 px-4 py-3 md:grid-cols-[8.75rem_minmax(0,1.35fr)_5.75rem_6.75rem_minmax(0,3.05fr)_1rem] ${
                     item.paid ? "bg-transparent" : "bg-white/[0.02]"
                   }`}
                 >
@@ -463,7 +494,8 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
                   <div>
                     <Input
                       value={item.title}
-                      className="h-7 text-body-sm text-white/72"
+                      className="!h-7 py-0 text-body-sm text-white/72"
+                      style={{ height: "1.75rem", minHeight: "1.75rem", maxHeight: "1.75rem" }}
                       onChange={(event) => updateItem(item.id, "title", event.target.value)}
                     />
                   </div>
@@ -480,25 +512,30 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
                     <Input
                       value={item.amount}
                       inputMode="decimal"
-                      className="h-7 pl-6 text-body-sm text-white/72"
-                      onChange={(event) => updateItem(item.id, "amount", event.target.value)}
+                      className="!h-7 py-0 pl-6 text-body-sm text-white/72"
+                      style={{ height: "1.75rem", minHeight: "1.75rem", maxHeight: "1.75rem" }}
+                      onChange={(event) =>
+                        updateItem(item.id, "amount", formatNumberInput(event.target.value))
+                      }
                     />
                   </div>
                   <div>
                     <Input
                       value={item.notes}
                       placeholder="Optional notes"
-                      className="h-7 text-body-sm text-white/72"
+                      className="!h-7 py-0 text-body-sm text-white/72"
+                      style={{ height: "1.75rem", minHeight: "1.75rem", maxHeight: "1.75rem" }}
                       onChange={(event) => updateItem(item.id, "notes", event.target.value)}
                     />
                   </div>
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      className="text-body-sm uppercase tracking-[0.08em] text-[var(--accent-hex)] transition-opacity hover:opacity-80"
+                      aria-label="Delete cost"
+                      className="text-body-lg leading-none text-[var(--accent-hex)] transition-opacity hover:opacity-80"
                       onClick={() => deleteItem(item.id)}
                     >
-                      Delete
+                      ×
                     </button>
                   </div>
                 </div>

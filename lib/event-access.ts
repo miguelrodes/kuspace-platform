@@ -6,7 +6,11 @@ import type {
   GuestlistEntry,
   TicketSection,
 } from "@/types/event";
-import type { ConsumerUser, ConsumerTicketWalletEntry } from "@/types/user";
+import type {
+  ConsumerTicketStatus,
+  ConsumerUser,
+  ConsumerTicketWalletEntry,
+} from "@/types/user";
 
 export function getEventAccessAssignment(
   event: Event,
@@ -38,6 +42,23 @@ export function isQrActiveForAssignment(
   }
 
   return isQrActiveForPaymentState(assignment.paymentState);
+}
+
+export function getConsumerTicketStatus(params: {
+  walletStatus?: ConsumerTicketStatus;
+  assignment?: EventAccessAssignment;
+}): ConsumerTicketStatus {
+  const { walletStatus, assignment } = params;
+
+  if (walletStatus) {
+    return walletStatus;
+  }
+
+  if (assignment?.checkedIn) {
+    return "scanned";
+  }
+
+  return isQrActiveForAssignment(assignment) ? "active" : "inactive";
 }
 
 export function canUserSeeTicketSection(
@@ -187,6 +208,7 @@ export function syncTicketPurchaseToUser(
             ...entry,
             quantity: entry.quantity + purchase.quantity,
             ticketLabel: purchase.ticketLabel ?? entry.ticketLabel,
+            status: purchase.status ?? entry.status,
           }
         : entry,
     ),

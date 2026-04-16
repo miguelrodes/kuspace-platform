@@ -26,7 +26,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "appearance-none border-solid inline-flex items-center justify-center rounded-[var(--radius-button-tag)] px-5 py-px whitespace-nowrap text-body leading-none font-medium transition outline-none",
+        "appearance-none border-solid inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-button-tag)] px-5 py-px whitespace-nowrap text-body leading-none font-medium transition outline-none disabled:cursor-not-allowed",
         variantClasses[variant],
         className,
       )}
