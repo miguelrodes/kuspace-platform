@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog, DIALOG_ACTION_CLASS, DIALOG_FIELD_LABEL_CLASS, DIALOG_TITLE_CLASS } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
-import { EditorSectionHeader } from "@/components/editor/editor-section-header";
+import { EditorSectionTitle } from "@/components/editor/editor-section-title";
 import { TicketSummaryPanel } from "@/components/editor/ticket-summary-panel";
 import { TicketTierCard, type TicketSectionDraft } from "@/components/editor/ticket-tier-card";
 import type { EventStatus, TicketReleaseMode, TicketSection, TicketSectionVisibility, TicketTier, TicketTierStatus } from "@/types/event";
@@ -485,19 +485,20 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
     label: section.name,
   }));
   const homeDropdownTriggerClassName =
-    "h-7 justify-start gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80 disabled:cursor-not-allowed disabled:text-muted";
-  const homeDropdownOptionClassName = "text-body-sm uppercase tracking-widerish";
+    "h-7 w-full justify-between gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80 disabled:cursor-not-allowed disabled:text-muted";
+  const homeDropdownOptionClassName =
+    "flex w-full justify-end px-2 py-1 text-body-xs uppercase tracking-widerish text-right";
 
   return (
     <section className="w-full max-w-full min-w-0 overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel p-5">
       <div className="w-full max-w-full min-w-0 space-y-2">
-        <EditorSectionHeader
-          title="Tickets"
-          actions={
+        <div className="flex items-start justify-between gap-3">
+          <EditorSectionTitle>Tickets</EditorSectionTitle>
+          <div className="-mr-3 ml-auto flex-1 text-right">
             <Button
               type="button"
               variant="ghost"
-              className="h-8 px-4 text-body-sm uppercase tracking-[0.12em]"
+              className="h-8 w-full justify-end px-0 text-right text-body-sm uppercase tracking-[0.12em]"
               style={{ color: "var(--accent-hex)" }}
               onClick={() => {
                 setNewSectionName("");
@@ -510,10 +511,10 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
             >
               Add Section
             </Button>
-          }
-        />
+          </div>
+        </div>
 
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -537,11 +538,12 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
           </div>
 
           {view === "sections" && activeSection ? (
-            <div className="w-full sm:w-[12rem]">
+            <div className="ml-auto w-full max-w-[10rem]">
               <DropdownSelect
                 value={activeSection.id}
                 options={sectionOptions}
                 className={homeDropdownTriggerClassName}
+                labelClassName="block w-full text-right"
                 optionClassName={homeDropdownOptionClassName}
                 disabled={value.sections.length <= 1}
                 onChange={(sectionId) =>
@@ -576,8 +578,7 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
               }
               setSectionPendingDelete(activeSection);
             }}
-            onAddPhase={() => {
-              const nextPhase = createEmptyPhase(`Phase ${activeSection.phases.length + 1}`);
+            onAddPhase={(nextPhase) => {
               onChange({
                 ...value,
                 sections: value.sections.map((section) =>
@@ -589,7 +590,6 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
                     : section,
                 ),
               });
-              return nextPhase.id;
             }}
           />
         ) : null}

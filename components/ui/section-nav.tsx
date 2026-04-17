@@ -7,6 +7,7 @@ type SectionNavProps = {
   activeItem: string;
   onChange?: (item: string) => void;
   className?: string;
+  itemClassName?: string;
 };
 
 export function SectionNav({
@@ -14,6 +15,7 @@ export function SectionNav({
   activeItem,
   onChange,
   className,
+  itemClassName,
 }: SectionNavProps) {
   return (
     <nav aria-label="Section navigation" className={className}>
@@ -28,7 +30,8 @@ export function SectionNav({
                 onClick={() => onChange?.(item)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "relative border-0 bg-transparent px-0 pb-1 text-subheading uppercase tracking-widerish transition outline-none",
+                  "relative border-0 bg-transparent px-0 pb-1 uppercase tracking-widerish transition outline-none",
+                  itemClassName ?? "text-subheading",
                   isActive ? "text-fg" : "text-muted hover:text-fg",
                 )}
               >

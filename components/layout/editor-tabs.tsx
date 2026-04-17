@@ -35,6 +35,7 @@ export function EditorTabs({
   return (
     <SectionNav
       className={className}
+      itemClassName="text-body-lg"
       items={editorTabs.map((tab) => editorTabLabelMap[tab])}
       activeItem={editorTabLabelMap[activeTab]}
       onChange={

@@ -541,38 +541,38 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Total Capacity</p>
-          <p className="mt-1 text-body text-fg">{metrics.totalCapacity}</p>
+          <p className="mt-1 text-sm text-fg">{metrics.totalCapacity}</p>
         </div>
-        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Sold Capacity</p>
-          <p className="mt-1 text-body text-fg">{metrics.soldCapacity}</p>
+          <p className="mt-1 text-sm text-fg">{metrics.soldCapacity}</p>
         </div>
-        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Total Revenue</p>
-          <p className="mt-1 text-body text-fg">{formatCurrency(metrics.totalRevenue)}</p>
+          <p className="mt-1 text-sm text-fg">{formatCurrency(metrics.totalRevenue)}</p>
         </div>
-        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Velocity</p>
-          <p className="mt-1 text-body text-fg">{formatTicketsPerHour(metrics.averageVelocity)}</p>
+          <p className="mt-1 text-sm text-fg">{formatTicketsPerHour(metrics.averageVelocity)}</p>
         </div>
-        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Avg Ticket Price</p>
-          <p className="mt-1 text-body text-fg">{formatCurrency(metrics.averageTicketPrice)}</p>
+          <p className="mt-1 text-sm text-fg">{formatCurrency(metrics.averageTicketPrice)}</p>
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="mt-10 space-y-2" style={{ marginTop: "2.5rem" }}>
         <p className="text-body uppercase tracking-widerish text-fg">Section Performance Breakdown</p>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="flex flex-wrap gap-3">
           {sectionPerformance.map((section) => (
             <div
               key={section.id}
-              className="rounded-[var(--radius-surface)] border border-border bg-panel p-4"
+              className="w-[16rem] max-w-[16rem] min-w-[16rem] rounded-[var(--radius-surface)] border border-border bg-panel px-4 py-2"
             >
-              <div className="space-y-4">
-                <div className="border-b border-border pb-3">
+              <div className="space-y-1">
+                <div className="border-b border-border pb-1">
                   <p className="truncate text-body uppercase tracking-[0.02em] text-fg">
                     {section.name}
                   </p>
@@ -601,7 +601,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="mt-10 space-y-2" style={{ marginTop: "2.5rem" }}>
         <p className="text-body uppercase tracking-widerish text-fg">Ticket Metrics</p>
         <div className="grid gap-4 xl:grid-cols-2">
           <SummaryChart

@@ -1,15 +1,8 @@
 "use client";
 
-import { EventStatusBadge } from "@/components/editor/event-status-badge";
-import type { EventStatus } from "@/types/event";
-
-type EventEditorHeaderProps = {
-  status: EventStatus;
-};
-
-export function EventEditorHeader({ status }: EventEditorHeaderProps) {
+export function EventEditorHeader() {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="flex flex-wrap items-center gap-4">
       <h1
         className="text-subheading uppercase"
         style={{
@@ -21,7 +14,6 @@ export function EventEditorHeader({ status }: EventEditorHeaderProps) {
         Event Editor
       </h1>
 
-      <EventStatusBadge status={status} />
     </div>
   );
 }

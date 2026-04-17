@@ -10,6 +10,7 @@ import { useMockEventsStore } from "@/lib/mock-store";
 import { EventEditorHeader } from "@/components/editor/event-editor-header";
 import { EditorTabNav } from "@/components/editor/editor-tab-nav";
 import { EditorActionBar } from "@/components/editor/editor-action-bar";
+import { EventStatusBadge } from "@/components/editor/event-status-badge";
 import { ConfirmDialog } from "@/components/ui/action-dialog";
 import {
   CoverTab,
@@ -999,12 +1000,15 @@ export function EventEditorShell(props: EventEditorShellProps) {
 
   return (
     <div className="-mt-6 space-y-2">
-      <EventEditorHeader status={localStatus} />
+      <EventEditorHeader />
 
       <div className="pt-3">
         <div className="flex flex-wrap items-center gap-4">
           <EditorTabNav activeTab={activeTab} onChange={setActiveTab} />
-          <div className="ml-auto">
+          <div className="ml-auto relative flex items-end justify-end">
+            <span className="pointer-events-none absolute -top-6 right-0 w-full text-right">
+              <EventStatusBadge status={localStatus} />
+            </span>
             <EditorActionBar
               status={localStatus}
               readOnly={isReadOnly}

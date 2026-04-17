@@ -382,30 +382,7 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
           }
         />
 
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Budget Remaining</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.budgetRemaining)}</p>
-          </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Total Costs</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.totalCosts)}</p>
-          </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Paid</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.paid)}</p>
-          </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Unpaid</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.unpaid)}</p>
-          </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Revenue</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(ticketRevenue)}</p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-[12rem_12rem]">
+        <div className="-mt-2 grid gap-4 md:grid-cols-[12rem_12rem]">
           <div>
             <label className="text-body uppercase tracking-widerish text-fg">Budget Cap</label>
             <div className="relative mt-1">
@@ -439,7 +416,30 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
           </div>
         </div>
 
-        <div className="overflow-visible rounded-[var(--radius-surface)] border border-border bg-panel">
+        <div className="grid gap-3 md:grid-cols-5">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
+            <p className="text-body-sm uppercase tracking-widerish text-muted">Budget Remaining</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.budgetRemaining)}</p>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
+            <p className="text-body-sm uppercase tracking-widerish text-muted">Total Costs</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.totalCosts)}</p>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
+            <p className="text-body-sm uppercase tracking-widerish text-muted">Paid</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.paid)}</p>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
+            <p className="text-body-sm uppercase tracking-widerish text-muted">Unpaid</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.unpaid)}</p>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
+            <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Revenue</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(ticketRevenue)}</p>
+          </div>
+        </div>
+
+        <div className="mt-8 overflow-visible rounded-[var(--radius-surface)] border border-border bg-panel">
           <div className="grid gap-2 border-b border-border px-4 py-3 text-body-sm uppercase tracking-widerish text-muted md:grid-cols-[8.75rem_minmax(0,1.35fr)_5.75rem_6.75rem_minmax(0,3.05fr)_1rem]">
             <div className="flex h-7 items-center">
               <p>Category</p>

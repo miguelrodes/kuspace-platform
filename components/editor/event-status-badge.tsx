@@ -1,6 +1,5 @@
 "use client";
 
-import { Tag } from "@/components/ui/tag";
 import type { EventStatus } from "@/types/event";
 
 type EventStatusBadgeProps = {
@@ -14,11 +13,14 @@ const statusLabelMap: Record<Extract<EventStatus, "draft" | "live" | "upcoming" 
   past: "Past",
 };
 
-const statusToneMap = {
-  draft: "draft",
-  live: "published",
-  upcoming: "neutral",
-  past: "past",
+const statusColorMap: Record<
+  Extract<EventStatus, "draft" | "live" | "upcoming" | "past">,
+  string
+> = {
+  draft: "hsl(var(--warning))",
+  live: "hsl(var(--success))",
+  upcoming: "#60A5FA",
+  past: "hsl(var(--muted))",
 } as const;
 
 export function EventStatusBadge({ status }: EventStatusBadgeProps) {
@@ -27,8 +29,11 @@ export function EventStatusBadge({ status }: EventStatusBadgeProps) {
   }
 
   return (
-    <Tag tone={statusToneMap[status]}>
+    <span
+      className="block w-full text-right text-body-sm uppercase tracking-widerish leading-none"
+      style={{ color: statusColorMap[status] }}
+    >
       {statusLabelMap[status]}
-    </Tag>
+    </span>
   );
 }

@@ -11,6 +11,7 @@
   --warning-hex: #facc15;
   --danger: 0 84% 60%;
   --success: 142 70% 45%;
+  --info: 210 92% 64%;
   --warning: 38 92% 55%;
   --glow: 0 0 18px rgba(242, 91, 105, 0.16);
   --radius: 6px;
@@ -36,6 +37,8 @@
   --text-base-line-height: 1.45;
   --text-sm: 0.875rem;
   --text-sm-line-height: 1.4;
+  --text-xs: 0.75rem;
+  --text-xs-line-height: 1.35;
 }
 
 html,
@@ -85,7 +88,7 @@ h4 {
 }
 
 ::selection {
-  background: rgba(242, 91, 105, 0.2);
+  background: rgba(0, 120, 255, 0.35);
 }
 
 @layer utilities {
@@ -197,6 +200,11 @@ h4 {
   .text-body-sm {
     font-size: var(--text-sm);
     line-height: var(--text-sm-line-height);
+  }
+
+  .text-body-xs {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-line-height);
   }
 
   .rounded-base {

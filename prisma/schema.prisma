@@ -1,0 +1,528 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventStatus {
+  draft
+  upcoming
+  live
+  past
+  cancelled
+}
+
+enum AdmissionMode {
+  public
+  curated
+}
+
+enum EventDisplayMode {
+  event
+  room
+}
+
+enum EventType {
+  room
+  terrace
+  festival
+  warehouse
+}
+
+enum LineupEntryKind {
+  main
+  opener
+  special_guest
+  resident
+}
+
+enum EventAccessAssignmentSource {
+  purchase
+  manual
+  approval
+}
+
+enum EventAccessPaymentState {
+  not_required
+  pending
+  paid
+  waived
+}
+
+enum EventApplicationStatus {
+  pending
+  accepted
+  denied
+}
+
+enum GuestlistEntrySource {
+  user
+  manual
+}
+
+enum TicketTierVisibility {
+  public
+  hidden
+}
+
+enum TicketSectionVisibility {
+  public
+  hidden
+  restricted
+}
+
+enum TicketTierStatus {
+  live
+  upcoming
+  sold_out
+}
+
+enum TicketReleaseMode {
+  manual
+  scheduled
+  after_previous_sold_out
+}
+
+enum RecruiterType {
+  nightclub
+  label
+}
+
+enum ConsumerTicketStatus {
+  active
+  inactive
+  scanned
+}
+
+enum ProfileVisibility {
+  public
+  private
+}
+
+/// Recruiter profiles follow the current app model:
+/// recruiterType is the only recruiter classification field.
+/// Legacy promoter/kind concepts are intentionally not part of persistence.
+model RecruiterProfile {
+  id                  String                  @id @default(uuid())
+  slug                String                  @unique
+  recruiterType       RecruiterType
+  realName            String?
+  displayName         String
+  avatarImageUrl      String?
+  bannerImageUrl      String?
+  bio                 String?
+  locationDisplayText String?
+  canFollow           Boolean?
+  instagram           String?
+  soundcloud          String?
+  spotify             String?
+  residentAdvisor     String?
+  website             String?
+  email               String?
+  mapsLocation        String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  stats               RecruiterProfileStats?
+  soundProfile        RecruiterSoundProfile?
+  events              Event[]
+  labels              EventLabel[]            @relation("LabelRecruiterProfile")
+
+  @@index([recruiterType])
+}
+
+model RecruiterProfileStats {
+  recruiterProfileId  String           @id
+  eventsHeld          Int?
+  citiesActive        Int?
+  followers           Int?
+  publicRating        Float?
+  displayEventsHeld   Boolean          @default(true)
+  displayCitiesActive Boolean          @default(true)
+  displayFollowers    Boolean          @default(true)
+  displayPublicRating Boolean          @default(true)
+  recruiterProfile    RecruiterProfile @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
+}
+
+model RecruiterSoundProfile {
+  id                String                       @id @default(uuid())
+  recruiterProfileId String                      @unique
+  roomSize          Int?
+  roomCount         Int?
+  recruiterProfile  RecruiterProfile             @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
+  genres            RecruiterSoundProfileGenre[]
+  rooms             RecruiterSoundProfileRoom[]
+}
+
+model RecruiterSoundProfileGenre {
+  id                    String                @id @default(uuid())
+  recruiterSoundProfileId String
+  value                 String
+  sortOrder             Int
+  recruiterSoundProfile RecruiterSoundProfile @relation(fields: [recruiterSoundProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([recruiterSoundProfileId, sortOrder])
+}
+
+model RecruiterSoundProfileRoom {
+  id                    String                @id @default(uuid())
+  recruiterSoundProfileId String
+  name                  String
+  capacity              Int
+  sortOrder             Int
+  recruiterSoundProfile RecruiterSoundProfile @relation(fields: [recruiterSoundProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([recruiterSoundProfileId, sortOrder])
+}
+
+model ConsumerUser {
+  id                     String                       @id @default(uuid())
+  username               String                       @unique
+  firstName              String
+  lastName               String
+  email                  String                       @unique
+  phoneNumber            String?
+  avatarImageUrl         String?
+  city                   String?
+  birthdate              DateTime?
+  profileVisibility      ProfileVisibility?
+  notificationsEnabled   Boolean?
+  createdAt              DateTime                     @default(now())
+  favoriteGenres         ConsumerUserFavoriteGenre[]
+  savedEvents            ConsumerUserSavedEvent[]
+  upcomingTicketEvents   ConsumerUserUpcomingTicketEvent[]
+  pastTicketEvents       ConsumerUserPastTicketEvent[]
+  ticketWalletEntries    ConsumerTicketWalletEntry[]
+  eventAccessAssignments EventAccessAssignment[]
+  eventApplications      EventApplication[]
+  guestlistEntries       GuestlistEntry[]
+}
+
+model ConsumerUserFavoriteGenre {
+  id             String       @id @default(uuid())
+  consumerUserId String
+  value          String
+  sortOrder      Int
+  consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([consumerUserId, sortOrder])
+}
+
+model ConsumerUserSavedEvent {
+  id             String       @id @default(uuid())
+  consumerUserId String
+  eventId        String
+  createdAt      DateTime     @default(now())
+  consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([consumerUserId, eventId])
+}
+
+model ConsumerUserUpcomingTicketEvent {
+  id             String       @id @default(uuid())
+  consumerUserId String
+  eventId        String
+  createdAt      DateTime     @default(now())
+  consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([consumerUserId, eventId])
+}
+
+model ConsumerUserPastTicketEvent {
+  id             String       @id @default(uuid())
+  consumerUserId String
+  eventId        String
+  createdAt      DateTime     @default(now())
+  consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([consumerUserId, eventId])
+}
+
+model ConsumerTicketWalletEntry {
+  id            String               @id @default(uuid())
+  consumerUserId String
+  eventId       String
+  accessGroupId String
+  quantity      Int
+  ticketLabel   String?
+  status        ConsumerTicketStatus?
+  createdAt     DateTime             @default(now())
+  consumerUser  ConsumerUser         @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+  event         Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  accessGroup   AccessGroup          @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
+}
+
+model Event {
+  id                String                    @id @default(uuid())
+  slug              String                    @unique
+  status            EventStatus
+  admissionMode     AdmissionMode
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  recruiterProfileId String
+  title             String
+  description       String?
+  shortDescription  String?
+  genreDisplayMode  EventDisplayMode?
+  date              DateTime
+  timeStart         String?
+  timeEnd           String?
+  imageUrl          String
+  imageAlt          String
+  location          String
+  venue             String
+  capacityTarget    Int
+  eventType         EventType
+  roomSize          Int
+  numberOfRooms     Int?
+  totalBudget       Decimal                   @default(0) @db.Decimal(12, 2)
+  recruiterProfile  RecruiterProfile          @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
+  genres            EventGenre[]
+  rooms             EventRoom[]
+  lineupEntries     LineupEntry[]
+  timetableRows     TimetableRow[]
+  accessGroups      AccessGroup[]
+  accessAssignments EventAccessAssignment[]
+  applications      EventApplication[]
+  guestlistEntries  GuestlistEntry[]
+  budgetItems       BudgetItem[]
+  ticketSections    TicketSection[]
+  labelLinks        EventLabelLink[]
+  savedByUsers      ConsumerUserSavedEvent[]
+  upcomingTicketUsers ConsumerUserUpcomingTicketEvent[]
+  pastTicketUsers   ConsumerUserPastTicketEvent[]
+  walletEntries     ConsumerTicketWalletEntry[]
+
+  @@index([status])
+  @@index([admissionMode])
+  @@index([recruiterProfileId, status])
+  @@index([admissionMode, status])
+}
+
+model EventGenre {
+  id        String @id @default(uuid())
+  eventId   String
+  value     String
+  sortOrder Int
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, sortOrder])
+}
+
+model EventRoom {
+  id        String           @id @default(uuid())
+  eventId   String
+  clientKey String?
+  name      String
+  capacity  Int
+  sortOrder Int
+  event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  genres    EventRoomGenre[]
+  lineupRooms LineupEntryRoom[]
+  timetableRows TimetableRow[]
+}
+
+model EventRoomGenre {
+  id          String    @id @default(uuid())
+  eventRoomId String
+  value       String
+  sortOrder   Int
+  eventRoom   EventRoom @relation(fields: [eventRoomId], references: [id], onDelete: Cascade)
+
+  @@unique([eventRoomId, sortOrder])
+}
+
+model LineupEntry {
+  id        String            @id @default(uuid())
+  eventId   String
+  clientKey String?
+  artistId  String
+  name      String
+  kind      LineupEntryKind?
+  sortOrder Int
+  event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  roomLinks LineupEntryRoom[]
+  timetableRows TimetableRow[]
+}
+
+model LineupEntryRoom {
+  lineupEntryId String
+  eventRoomId   String
+  lineupEntry   LineupEntry @relation(fields: [lineupEntryId], references: [id], onDelete: Cascade)
+  eventRoom     EventRoom   @relation(fields: [eventRoomId], references: [id], onDelete: Cascade)
+
+  @@id([lineupEntryId, eventRoomId])
+}
+
+model TimetableRow {
+  id            String      @id @default(uuid())
+  eventId       String
+  clientKey     String?
+  title         String
+  lineupEntryId String?
+  eventRoomId   String?
+  roomName      String?
+  notes         String?
+  startTime     String
+  endTime       String
+  sortOrder     Int
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  lineupEntry   LineupEntry? @relation(fields: [lineupEntryId], references: [id], onDelete: SetNull)
+  eventRoom     EventRoom?   @relation(fields: [eventRoomId], references: [id], onDelete: SetNull)
+}
+
+model AccessGroup {
+  id                String                    @id @default(uuid())
+  eventId           String
+  clientKey         String?
+  name              String
+  sortOrder         Int
+  event             Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  accessAssignments EventAccessAssignment[]
+  applications      EventApplication[]
+  guestlistEntries  GuestlistEntry[]
+  ticketSections    TicketSection[]
+  allowedInSections TicketSectionAllowedGroup[]
+  walletEntries     ConsumerTicketWalletEntry[]
+
+  @@unique([eventId, sortOrder])
+}
+
+model EventAccessAssignment {
+  id            String                       @id @default(uuid())
+  eventId       String
+  consumerUserId String
+  accessGroupId String
+  source        EventAccessAssignmentSource
+  paymentState  EventAccessPaymentState
+  checkedIn     Boolean
+  assignedAt    DateTime?
+  assignedBy    String?
+  notes         String?
+  event         Event                        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  consumerUser  ConsumerUser                 @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+  accessGroup   AccessGroup                  @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, consumerUserId])
+}
+
+model EventApplication {
+  id            String                 @id @default(uuid())
+  eventId       String
+  consumerUserId String
+  status        EventApplicationStatus
+  appliedAt     DateTime
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  accessGroupId String?
+  notes         String?
+  event         Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  consumerUser  ConsumerUser           @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
+  accessGroup   AccessGroup?           @relation(fields: [accessGroupId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, consumerUserId])
+}
+
+model GuestlistEntry {
+  id            String              @id @default(uuid())
+  eventId       String
+  source        GuestlistEntrySource
+  accessGroupId String
+  consumerUserId String?
+  firstName     String?
+  lastName      String?
+  checkedIn     Boolean
+  createdAt     DateTime            @default(now())
+  notes         String?
+  event         Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  accessGroup   AccessGroup         @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
+  consumerUser  ConsumerUser?       @relation(fields: [consumerUserId], references: [id], onDelete: SetNull)
+}
+
+model BudgetItem {
+  id        String  @id @default(uuid())
+  eventId   String
+  clientKey String?
+  category  String
+  title     String
+  amount    Decimal @db.Decimal(12, 2)
+  paid      Boolean
+  notes     String?
+  sortOrder Int
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model TicketSection {
+  id                String                    @id @default(uuid())
+  eventId           String
+  clientKey         String?
+  name              String
+  visibility        TicketSectionVisibility
+  accessGroupId     String
+  sortOrder         Int
+  event             Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  accessGroup       AccessGroup               @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
+  allowedGroups     TicketSectionAllowedGroup[]
+  phases            TicketTier[]
+
+  @@unique([eventId, sortOrder])
+}
+
+model TicketSectionAllowedGroup {
+  ticketSectionId String
+  accessGroupId   String
+  ticketSection   TicketSection @relation(fields: [ticketSectionId], references: [id], onDelete: Cascade)
+  accessGroup     AccessGroup   @relation(fields: [accessGroupId], references: [id], onDelete: Cascade)
+
+  @@id([ticketSectionId, accessGroupId])
+}
+
+/// Canonical ticket persistence is section-based:
+/// Event -> TicketSection -> TicketTier.
+/// The legacy top-level event.tickets.tiers array remains an app compatibility layer only.
+model TicketTier {
+  id                 String               @id @default(uuid())
+  ticketSectionId    String
+  clientKey          String?
+  name               String
+  price              Decimal              @db.Decimal(12, 2)
+  quantityAvailable  Int
+  quantitySold       Int                  @default(0)
+  visibility         TicketTierVisibility
+  status             TicketTierStatus
+  sortOrder          Int
+  salesStart         DateTime?
+  salesEnd           DateTime?
+  releaseMode        TicketReleaseMode?
+  releaseAfterTierId String?
+  ticketSection      TicketSection        @relation(fields: [ticketSectionId], references: [id], onDelete: Cascade)
+  releaseAfterTier   TicketTier?          @relation("TicketTierReleaseChain", fields: [releaseAfterTierId], references: [id], onDelete: SetNull)
+  releasesNext       TicketTier[]         @relation("TicketTierReleaseChain")
+
+  @@unique([ticketSectionId, sortOrder])
+}
+
+model EventLabel {
+  id                 String            @id @default(uuid())
+  name               String
+  profileSlug        String?
+  avatarImageUrl     String?
+  recruiterProfileId String?
+  recruiterProfile   RecruiterProfile? @relation("LabelRecruiterProfile", fields: [recruiterProfileId], references: [id], onDelete: SetNull)
+  eventLinks         EventLabelLink[]
+}
+
+model EventLabelLink {
+  eventId    String
+  eventLabelId String
+  sortOrder  Int
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventLabel EventLabel @relation(fields: [eventLabelId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, eventLabelId])
+}

@@ -604,10 +604,10 @@ export function GuestlistTab({
 
           <div className="flex flex-wrap items-end gap-x-8 gap-y-3 pt-1">
             <div className="relative top-[7px] ml-1 flex items-baseline gap-3">
-              <p className="text-subheading uppercase tracking-widerish text-[#FFFFFF]">
+              <p className="text-body-lg uppercase tracking-widerish text-[#FFFFFF]">
                 Attendees
               </p>
-              <p className="relative -top-[2px] text-subheading text-[#FFFFFF]">
+              <p className="relative -top-[2px] text-body-lg text-[#FFFFFF]">
                 ({totalAttendees})
               </p>
             </div>

@@ -26,6 +26,7 @@ type ReleasePhaseRowProps = {
   requireTitle?: boolean;
   onClose: () => void;
   onChange: (nextValue: TicketPhaseDraft) => void;
+  onDone?: (nextValue: TicketPhaseDraft) => void;
 };
 
 function parseNumber(value: string) {
@@ -64,6 +65,7 @@ export function ReleasePhaseRow({
   requireTitle = false,
   onClose,
   onChange,
+  onDone,
 }: ReleasePhaseRowProps) {
   const controlClassName =
     "!h-[1.625rem] !px-2.5 !py-0 !text-sm !leading-none";
@@ -353,6 +355,7 @@ export function ReleasePhaseRow({
                   setShowQuantitySoldError(true);
                   return;
                 }
+                onDone?.(value);
                 onClose();
               }}
             >

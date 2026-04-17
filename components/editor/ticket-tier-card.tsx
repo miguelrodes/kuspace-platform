@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/action-dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ type TicketTierCardProps = {
   canAddPhase: boolean;
   onChange: (nextValue: TicketSectionDraft) => void;
   onRemoveSection: () => void;
-  onAddPhase: () => string;
+  onAddPhase: (phase: TicketPhaseDraft) => void;
 };
 
 function parseNumber(value: string) {
@@ -112,6 +113,59 @@ function SectionActionMenu({
   );
 }
 
+function PhaseActionMenu({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Open phase actions"
+        className="flex h-6 w-6 items-center justify-center rounded-sm transition hover:opacity-80"
+        style={{ color: "var(--accent-hex)" }}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <svg aria-hidden="true" viewBox="0 0 8 20" className="h-4 w-2 fill-current">
+          <circle cx="4" cy="3" r="1.6" />
+          <circle cx="4" cy="10" r="1.6" />
+          <circle cx="4" cy="17" r="1.6" />
+        </svg>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-full z-10 mt-1 min-w-[7.5rem] rounded-[var(--radius-surface)] border border-border bg-panel p-0.5 shadow-xl">
+          <button
+            type="button"
+            className="block w-full rounded-sm px-2 py-0.5 text-center text-body-sm text-[var(--accent-hex)] transition hover:bg-panel-2"
+            onClick={() => {
+              onEdit();
+              setOpen(false);
+            }}
+          >
+            Edit Phase
+          </button>
+          <button
+            type="button"
+            className="mt-0.5 block w-full rounded-sm px-2 py-0.5 text-center text-body-sm text-[hsl(var(--warning))] transition hover:bg-panel-2"
+            onClick={() => {
+              onDelete();
+              setOpen(false);
+            }}
+          >
+            Delete Phase
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TicketTierCard({
   value,
   accessGroups,
@@ -123,6 +177,8 @@ export function TicketTierCard({
   onAddPhase,
 }: TicketTierCardProps) {
   const [activePhaseId, setActivePhaseId] = useState<string | null>(null);
+  const [draftPhase, setDraftPhase] = useState<TicketPhaseDraft | null>(null);
+  const [phasePendingDeleteId, setPhasePendingDeleteId] = useState<string | null>(null);
   const totalCapacity = value.phases.reduce((sum, phase) => sum + parseNumber(phase.quantityAvailable), 0);
   const totalSold = value.phases.reduce((sum, phase) => sum + parseNumber(phase.quantitySold), 0);
   const revenueEarned = value.phases.reduce(
@@ -151,6 +207,11 @@ export function TicketTierCard({
     () => value.phases.find((phase) => phase.id === activePhaseId) ?? null,
     [activePhaseId, value.phases],
   );
+  const phasePendingDelete = useMemo(
+    () => value.phases.find((phase) => phase.id === phasePendingDeleteId) ?? null,
+    [phasePendingDeleteId, value.phases],
+  );
+  const phaseInEditor = activePhase ?? draftPhase;
   const availabilityOptions = [
     { value: "public", label: "Public" },
     { value: "hidden", label: "Hidden" },
@@ -176,17 +237,23 @@ export function TicketTierCard({
           </div>
         </div>
 
-        <div className="max-w-[18rem] pb-3">
+        <div className="max-w-[18rem] pb-2">
           <label className="text-body uppercase tracking-widerish text-fg">Section Name</label>
           <Input
             value={value.name}
-            className="mt-1 h-7 !bg-panel text-body-sm text-white/72 disabled:cursor-not-allowed disabled:text-muted"
+            className="mt-1 !h-7 !bg-panel py-0.5 text-body-sm text-white/72 disabled:cursor-not-allowed disabled:text-muted"
             disabled={!editableSection}
             onChange={(event) => onChange({ ...value, name: event.target.value })}
           />
         </div>
 
-        <div className="grid gap-6 pb-3 lg:grid-cols-[9rem_minmax(0,12rem)] lg:items-start">
+        <div
+          className={`grid gap-6 pb-3 lg:items-start ${
+            value.visibility === "restricted"
+              ? "lg:grid-cols-[9rem_minmax(0,12rem)_minmax(0,1fr)]"
+              : "lg:grid-cols-[9rem_minmax(0,12rem)]"
+          }`}
+        >
           <div className="min-w-0 lg:w-36">
             <label className="text-body uppercase tracking-widerish text-fg">Availability</label>
             <DropdownSelect
@@ -233,42 +300,41 @@ export function TicketTierCard({
           </div>
 
           {value.visibility === "restricted" ? (
-            <div className="min-w-0">
+            <div className="min-w-0 lg:min-w-[18rem]">
               <label className="text-body uppercase tracking-widerish text-fg">Allowed Groups</label>
-              <div className="mt-1 rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+              <div className="mt-1 flex h-7 items-center rounded-[var(--radius-surface)] border border-border bg-panel px-2.5">
                 {accessGroups.length === 0 ? (
-                  <p className="text-body-sm text-muted">No access groups available.</p>
+                  <p className="truncate text-body-sm text-muted">No access groups available.</p>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-body-sm text-muted">
-                      Users in any selected access group can see this section.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="min-w-0 overflow-x-auto whitespace-nowrap">
+                    <div className="inline-flex items-center text-body-sm">
                       {accessGroups.map((group) => {
                         const isActive = value.allowedGroupIds.includes(group.id);
                         return (
-                          <button
-                            key={group.id}
-                            type="button"
-                            className={`rounded-[var(--radius-button-tag)] border px-2.5 py-1 text-body-sm transition ${
-                              isActive
-                                ? "border-[var(--accent-hex)] text-fg"
-                                : "border-border text-muted hover:text-fg"
-                            }`}
-                            disabled={!editableSection}
-                            onClick={() => {
-                              const nextAllowedGroupIds = isActive
-                                ? value.allowedGroupIds.filter((groupId) => groupId !== group.id)
-                                : [...value.allowedGroupIds, group.id];
+                          <span key={group.id} className="inline-flex items-center">
+                            <button
+                              type="button"
+                              className={`text-body-sm transition ${
+                                isActive ? "text-fg" : "text-muted hover:text-fg"
+                              }`}
+                              disabled={!editableSection}
+                              onClick={() => {
+                                const nextAllowedGroupIds = isActive
+                                  ? value.allowedGroupIds.filter((groupId) => groupId !== group.id)
+                                  : [...value.allowedGroupIds, group.id];
 
-                              onChange({
-                                ...value,
-                                allowedGroupIds: nextAllowedGroupIds,
-                              });
-                            }}
-                          >
-                            {group.name}
-                          </button>
+                                onChange({
+                                  ...value,
+                                  allowedGroupIds: nextAllowedGroupIds,
+                                });
+                              }}
+                            >
+                              {group.name}
+                            </button>
+                            {group !== accessGroups[accessGroups.length - 1] ? (
+                              <span className="px-3 text-muted">|</span>
+                            ) : null}
+                          </span>
                         );
                       })}
                     </div>
@@ -280,21 +346,21 @@ export function TicketTierCard({
         </div>
 
         <div className="grid gap-3 pb-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Capacity</p>
-            <p className="mt-1 text-body-lg text-fg">{totalCapacity}</p>
+            <p className="mt-1 text-body text-fg">{totalCapacity}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Revenue Earned</p>
-            <p className="mt-1 text-body-lg text-fg">{formatCurrency(revenueEarned)}</p>
+            <p className="mt-1 text-body text-fg">{formatCurrency(revenueEarned)}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Velocity</p>
-            <p className="mt-1 text-body-lg text-fg">{formatTicketsPerHour(sectionAverageVelocity)}</p>
+            <p className="mt-1 text-body text-fg">{formatTicketsPerHour(sectionAverageVelocity)}</p>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
             <p className="text-body-sm uppercase tracking-widerish text-muted">% Sold</p>
-            <p className="mt-1 text-body-lg text-fg">{percentSold}%</p>
+            <p className="mt-1 text-body text-fg">{percentSold}%</p>
           </div>
         </div>
 
@@ -307,8 +373,20 @@ export function TicketTierCard({
               className="h-8 px-4 text-body-sm uppercase tracking-[0.12em]"
               style={{ color: "var(--accent-hex)" }}
               onClick={() => {
-                const nextPhaseId = onAddPhase();
-                setActivePhaseId(nextPhaseId);
+                setDraftPhase({
+                  id:
+                    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                      ? crypto.randomUUID()
+                      : `phase-${Date.now()}`,
+                  name: `Phase ${value.phases.length + 1}`,
+                  price: "",
+                  quantityAvailable: "",
+                  quantitySold: "",
+                  status: "upcoming",
+                  salesStart: "",
+                  salesEnd: "",
+                  releaseMode: "manual",
+                });
               }}
               disabled={!canAddPhase}
             >
@@ -332,31 +410,26 @@ export function TicketTierCard({
                 return (
                   <div
                     key={phase.id}
-                    className={`w-[15.5rem] shrink-0 rounded-[var(--radius-surface)] border border-border bg-panel p-4 ${
+                    className={`w-[14.75rem] shrink-0 rounded-[var(--radius-surface)] border border-border bg-panel p-4 ${
                       phase.status === "sold_out" ? "opacity-80" : ""
                     }`}
                   >
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2">
                         <div className="min-w-0">
                           <p className="truncate text-body uppercase tracking-[0.02em] text-fg">
                             {phase.name || "Untitled Phase"}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-7 px-2.5 text-body-sm uppercase tracking-[0.08em]"
-                            style={{ color: "var(--accent-hex)" }}
-                            onClick={() => setActivePhaseId(phase.id)}
-                          >
-                            Edit
-                          </Button>
+                        <div className="-mr-1 flex items-center">
+                          <PhaseActionMenu
+                            onEdit={() => setActivePhaseId(phase.id)}
+                            onDelete={() => setPhasePendingDeleteId(phase.id)}
+                          />
                         </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-2.5">
                         <div className="flex items-baseline justify-between gap-4">
                           <p className="text-body text-muted">Price</p>
                           <p className="text-body text-fg">{formatCurrency(parseNumber(phase.price))}</p>
@@ -396,20 +469,56 @@ export function TicketTierCard({
         </div>
       </div>
 
-      {activePhase ? (
+      {phaseInEditor ? (
         <ReleasePhaseRow
           open
-          value={activePhase}
+          value={phaseInEditor}
           disabled={!editableSection}
-          onClose={() => setActivePhaseId(null)}
-          onChange={(nextPhase) =>
+          onClose={() => {
+            if (draftPhase) {
+              setDraftPhase(null);
+              return;
+            }
+            setActivePhaseId(null);
+          }}
+          onChange={(nextPhase) => {
+            if (draftPhase) {
+              setDraftPhase(nextPhase);
+              return;
+            }
             onChange({
               ...value,
               phases: value.phases.map((current) =>
-                current.id === activePhase.id ? nextPhase : current,
+                current.id === phaseInEditor.id ? nextPhase : current,
               ),
-            })
-          }
+            });
+          }}
+          onDone={(nextPhase) => {
+            if (!draftPhase) {
+              return;
+            }
+            onAddPhase(nextPhase);
+          }}
+        />
+      ) : null}
+
+      {phasePendingDelete ? (
+        <ConfirmDialog
+          title="Delete Ticket Phase"
+          message={`Delete "${phasePendingDelete.name || "Untitled Phase"}"? This cannot be undone.`}
+          confirmLabel="Delete Phase"
+          confirmTone="warning"
+          onClose={() => setPhasePendingDeleteId(null)}
+          onConfirm={() => {
+            onChange({
+              ...value,
+              phases: value.phases.filter((phase) => phase.id !== phasePendingDelete.id),
+            });
+            if (activePhaseId === phasePendingDelete.id) {
+              setActivePhaseId(null);
+            }
+            setPhasePendingDeleteId(null);
+          }}
         />
       ) : null}
     </section>

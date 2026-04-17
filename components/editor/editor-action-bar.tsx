@@ -18,7 +18,8 @@ export function EditorActionBar({
   onRevertToDraft,
 }: EditorActionBarProps) {
   const actionButtonClassName =
-    "relative z-10 inline-flex h-7 items-center justify-center whitespace-nowrap rounded-[var(--radius-button-tag)] border-0 bg-transparent px-2.5 text-body-sm uppercase tracking-[0.1em] leading-none outline-none transition";
+    "relative z-10 inline-flex h-7 items-center justify-center whitespace-nowrap rounded-[var(--radius-button-tag)] border-0 bg-transparent text-body-sm uppercase tracking-[0.1em] leading-none outline-none transition";
+  const actionButtonSpacingClassName = `${actionButtonClassName} px-2.5`;
 
   if (readOnly) {
     return (
@@ -33,14 +34,16 @@ export function EditorActionBar({
   const isLive = status === "live";
 
   return (
-    <div className="relative z-10 flex flex-wrap items-center gap-3">
+    <div className="relative z-10 flex flex-wrap items-end gap-3">
       {isDraft ? (
         <>
           <a
             href="#"
-            className={actionButtonClassName}
+            className={`${actionButtonClassName} text-right`}
             style={{
               color: "var(--accent-hex)",
+              paddingRight: 0,
+              paddingLeft: 0,
             }}
             onClick={(event) => {
               event.preventDefault();
@@ -56,7 +59,8 @@ export function EditorActionBar({
         <>
           <a
             href="#"
-            className={`${actionButtonClassName} text-muted hover:text-[hsl(var(--warning))]`}
+            className={`${actionButtonClassName} justify-end text-right hover:text-[hsl(var(--warning))]`}
+            style={{ color: "hsl(215 14% 62% / 0.9)" }}
             onClick={(event) => {
               event.preventDefault();
               onRevertToDraft();
@@ -66,9 +70,12 @@ export function EditorActionBar({
           </a>
           <a
             href="#"
-            className={actionButtonClassName}
+            className={`${actionButtonClassName} justify-end text-right`}
             style={{
               color: "var(--accent-hex)",
+              marginLeft: "0.5rem",
+              paddingRight: 0,
+              paddingLeft: 0,
             }}
             onClick={(event) => {
               event.preventDefault();
