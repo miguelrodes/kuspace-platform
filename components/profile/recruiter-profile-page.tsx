@@ -1,3 +1,6 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
 import { DJNetworkPanel } from "@/components/profile/dj-network-panel";
 import { ProfileEventsPanel } from "@/components/profile/profile-events-panel";
 import { ProfileHero } from "@/components/profile/profile-hero";
@@ -6,7 +9,7 @@ import { ProfileStats } from "@/components/profile/profile-stats";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
 import { RecruiterTopNav } from "@/components/layout/recruiter-top-nav";
 import { getPublicEventCollection } from "@/lib/event-status";
-import { mockRecruiterProfile } from "@/lib/mock-data";
+import { useMockEventsStore } from "@/lib/mock-store";
 
 type RecruiterProfilePageViewProps = {
   slug: string;
@@ -17,7 +20,27 @@ export function RecruiterProfilePageView({
   slug,
   audience = "recruiter",
 }: RecruiterProfilePageViewProps) {
-  const profile = mockRecruiterProfile;
+  const { profile } = useMockEventsStore();
+  const hasHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  if (!hasHydrated || !profile.slug) {
+    return (
+      <div className="min-h-screen bg-bg text-fg">
+        {audience === "recruiter" ? <RecruiterTopNav /> : <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />}
+
+        <main className="px-4 py-8 md:px-6">
+          <div className="mx-auto max-w-6xl">
+            <p className="text-body text-muted">Loading profile…</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const publicUpcomingEvents = getPublicEventCollection(profile.events?.upcoming ?? []).filter(
     (event) => event.status === "live",
   );

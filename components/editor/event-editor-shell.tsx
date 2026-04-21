@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Event, EditorTab, EventStatus } from "@/types/event";
-import { createDraftEventSeed } from "@/lib/mock-data";
+import { createDraftEventSeed } from "@/lib/event-draft";
 import { resolveManualAssignmentPaymentState } from "@/lib/event-access";
 import { isLockedEventStatus } from "@/lib/event-status";
 import { useMockEventsStore } from "@/lib/mock-store";

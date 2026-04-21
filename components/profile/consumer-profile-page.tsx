@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SectionNav } from "@/components/ui/section-nav";
 import { profileEventGridClassName } from "@/components/office/event-card-variants";
-import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
 
 const cityOptions = [
@@ -372,7 +371,7 @@ function ArtistsSeenContent({
 
 export function ConsumerProfilePageView() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { users, events, updateUser } = useMockEventsStore();
+  const { users, events, updateUser, getCurrentConsumerUser } = useMockEventsStore();
   const hasHydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -384,7 +383,7 @@ export function ConsumerProfilePageView() {
   const [activeEventSection, setActiveEventSection] = useState<"saved" | "upcoming" | "past">("saved");
   const [showGenreInput, setShowGenreInput] = useState(false);
 
-  const currentUser = users.find((user) => user.id === defaultConsumerUserId) ?? users[0];
+  const currentUser = getCurrentConsumerUser();
 
   const savedEvents = useMemo(
     () => events.filter((event) => currentUser?.savedEventSlugs?.includes(event.slug)),

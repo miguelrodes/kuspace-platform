@@ -2,217 +2,59 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import type { ArtistProfile, Event, EventAccessAssignment, EventStatus } from "@/types/event";
-import { createDraftEventSeed, initialMockState } from "@/lib/mock-data";
+import type { RecruiterProfile } from "@/types/profile";
+import type { ConsumerUser } from "@/types/user";
+import { createDraftEventSeed } from "@/lib/event-draft";
 import {
   applyToCuratedEvent as applyToCuratedEventRecord,
   approveCuratedApplication as approveCuratedApplicationRecord,
   denyCuratedApplication as denyCuratedApplicationRecord,
   syncTicketPurchaseToEvent,
   syncTicketPurchaseToUser,
-  syncUserWalletPurchasesIntoEvents,
 } from "@/lib/event-access";
 
 type MockStoreState = {
-  profile: typeof initialMockState.profile;
-  users: typeof initialMockState.users;
+  profile: RecruiterProfile;
+  users: ConsumerUser[];
   artists: ArtistProfile[];
   events: Event[];
 };
 
 type EventUpdate = Partial<Event> & Pick<Event, "id">;
-type UserUpdate = Partial<MockStoreState["users"][number]> & Pick<MockStoreState["users"][number], "id">;
+type UserUpdate = Partial<ConsumerUser> & Pick<ConsumerUser, "id">;
 
-const MOCK_STORE_STORAGE_KEY = "office-mvp-mock-store";
+const EMPTY_PROFILE: RecruiterProfile = {
+  id: "",
+  slug: "",
+  recruiterType: "nightclub",
+  displayName: "",
+};
 
 function getInitialStoreState(): MockStoreState {
   return {
-    profile: initialMockState.profile,
-    users: initialMockState.users,
-    artists: initialMockState.artists,
-    events: initialMockState.events,
+    profile: EMPTY_PROFILE,
+    users: [],
+    artists: [],
+    events: [],
   };
 }
 
-function readPersistedState(): MockStoreState | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(MOCK_STORE_STORAGE_KEY);
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue) as Partial<MockStoreState> | null;
-    if (
-      !parsed ||
-      !parsed.profile ||
-      !Array.isArray(parsed.users) ||
-      !Array.isArray(parsed.artists) ||
-      !Array.isArray(parsed.events)
-    ) {
-      return null;
-    }
-
-    return {
-      profile: parsed.profile,
-      users: parsed.users,
-      artists: parsed.artists,
-      events: parsed.events,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function normalizePersistedState(nextState: MockStoreState): MockStoreState {
-  const defaultUser = initialMockState.users[0];
-  const normalizedEvents = syncUserWalletPurchasesIntoEvents(
-    nextState.events.map((event) => {
-      const seededEvent = initialMockState.events.find((candidate) => candidate.id === event.id);
-      const eventSource = event;
-      const fallbackGuestlist = event.guestlist ?? seededEvent?.guestlist ?? {
-        accessGroups: [],
-        entries: [],
-        summary: {
-          ticketsSold: 0,
-          manualGuests: 0,
-          totalAttending: 0,
-        },
-      };
-      const fallbackAccessGroups = fallbackGuestlist.accessGroups ?? [];
-
-      return {
-        ...(seededEvent ?? {}),
-        ...eventSource,
-        guestlist: {
-          ...fallbackGuestlist,
-          accessGroups: fallbackAccessGroups,
-          entries: fallbackGuestlist.entries ?? [],
-        },
-        admissionMode: eventSource.admissionMode ?? seededEvent?.admissionMode ?? "public",
-        applications: event.applications ?? eventSource.applications ?? [],
-        accessAssignments: ((eventSource.accessAssignments?.length
-          ? eventSource.accessAssignments
-          : fallbackGuestlist.entries.flatMap((entry) => {
-              if (entry.source !== "user") {
-                return [];
-              }
-
-              const source: EventAccessAssignment["source"] =
-                entry.accessGroupId === "group-guestlist" ? "manual" : "purchase";
-              const paymentState: EventAccessAssignment["paymentState"] =
-                entry.accessGroupId === "group-guestlist" ? "not_required" : "paid";
-
-              return [
-                {
-                  eventId: event.id,
-                  userId: entry.userId,
-                  accessGroupId: entry.accessGroupId,
-                  source,
-                  paymentState,
-                  checkedIn: entry.checkedIn,
-                  assignedAt: entry.createdAt,
-                },
-              ];
-            })) ?? []
-        ).filter(
-          (assignment, index, assignments) =>
-            assignments.findIndex(
-              (candidate) =>
-                candidate.eventId === assignment.eventId &&
-                candidate.userId === assignment.userId,
-            ) === index,
-        ),
-        tickets: {
-          ...(seededEvent?.tickets ?? {}),
-          ...eventSource.tickets,
-          sections: (eventSource.tickets.sections ?? seededEvent?.tickets.sections ?? []).map((section) => ({
-            ...section,
-            visibility:
-              (section.visibility as string) === "guestlist" ? "restricted" : section.visibility,
-            accessGroupId:
-              section.accessGroupId ||
-              fallbackAccessGroups.find(
-                (group) => group.name.trim().toLowerCase() === section.name.trim().toLowerCase(),
-              )?.id ||
-              fallbackAccessGroups[0]?.id ||
-              "",
-            allowedGroupIds:
-              ((section.visibility as string) === "restricted" ||
-                (section.visibility as string) === "guestlist")
-                ? (section.allowedGroupIds?.filter(Boolean).length
-                    ? section.allowedGroupIds.filter(Boolean)
-                    : [
-                        section.accessGroupId ||
-                          fallbackAccessGroups.find(
-                            (group) =>
-                              group.name.trim().toLowerCase() === section.name.trim().toLowerCase(),
-                          )?.id ||
-                          fallbackAccessGroups[0]?.id ||
-                          "",
-                      ].filter(Boolean))
-                : [],
-          })),
-        },
-      };
-    }),
-    nextState.users,
+function deriveArtists(events: Event[], existingArtists: ArtistProfile[] = []) {
+  const fromEvents = Array.from(
+    new Map(
+      events
+        .flatMap((event) => event.lineup.entries)
+        .map((entry) => [entry.artistId, { id: entry.artistId, name: entry.name } satisfies ArtistProfile]),
+    ).values(),
   );
 
-  return {
-    ...nextState,
-    events: normalizedEvents,
-    users: nextState.users.map((user) => {
-      if (!defaultUser || user.id !== defaultUser.id) {
-        return user;
-      }
-
-      const normalizedUsername = (user.username || defaultUser.username).toLowerCase();
-      const shouldNormalizeDefaultUser =
-        normalizedUsername !== defaultUser.username ||
-        JSON.stringify(user.savedEventSlugs ?? []) !== JSON.stringify(defaultUser.savedEventSlugs ?? []) ||
-        JSON.stringify(user.upcomingTicketEventSlugs ?? []) !==
-          JSON.stringify(defaultUser.upcomingTicketEventSlugs ?? []) ||
-        JSON.stringify(user.pastTicketEventSlugs ?? []) !==
-          JSON.stringify(defaultUser.pastTicketEventSlugs ?? []) ||
-        JSON.stringify(user.ticketWalletEntries ?? []) !==
-          JSON.stringify(defaultUser.ticketWalletEntries ?? []);
-
-      if (shouldNormalizeDefaultUser) {
-        return {
-          ...user,
-          username: defaultUser.username,
-          email:
-            user.email === `${user.username}@mockspaceibiza.com` || !user.email
-              ? defaultUser.email
-              : user.email,
-          savedEventSlugs: defaultUser.savedEventSlugs,
-          upcomingTicketEventSlugs: defaultUser.upcomingTicketEventSlugs,
-          pastTicketEventSlugs: defaultUser.pastTicketEventSlugs,
-          ticketWalletEntries: defaultUser.ticketWalletEntries,
-        };
-      }
-
-      return user;
-    }),
-  };
-}
-
-function persistState(nextState: MockStoreState) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(MOCK_STORE_STORAGE_KEY, JSON.stringify(nextState));
-  } catch {
-    // Ignore persistence failures so demos still work without breaking the app.
-  }
+  return Array.from(
+    new Map([...existingArtists, ...fromEvents].map((artist) => [artist.id, artist])).values(),
+  ).sort((left, right) => left.name.localeCompare(right.name));
 }
 
 let storeState: MockStoreState = getInitialStoreState();
+let hasBootstrapped = false;
 
 const listeners = new Set<() => void>();
 
@@ -222,10 +64,7 @@ function emitChange() {
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
+  return () => listeners.delete(listener);
 }
 
 function getSnapshot() {
@@ -233,9 +72,38 @@ function getSnapshot() {
 }
 
 function updateState(nextState: MockStoreState) {
-  storeState = nextState;
-  persistState(nextState);
+  storeState = {
+    ...nextState,
+    artists: deriveArtists(nextState.events, nextState.artists),
+  };
   emitChange();
+}
+
+async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function bootstrapFromDb() {
+  const remoteState = await fetchJson<MockStoreState>("/api/store/bootstrap");
+  updateState({
+    ...remoteState,
+    artists: remoteState.artists?.length
+      ? remoteState.artists
+      : deriveArtists(remoteState.events),
+  });
 }
 
 function mergeEvent(existing: Event, update: EventUpdate): Event {
@@ -243,36 +111,14 @@ function mergeEvent(existing: Event, update: EventUpdate): Event {
     ...existing,
     ...update,
     cover: update.cover ? { ...existing.cover, ...update.cover } : existing.cover,
-    lineup: update.lineup
-      ? {
-          ...existing.lineup,
-          ...update.lineup,
-        }
-      : existing.lineup,
-    timetable: update.timetable
-      ? {
-          ...existing.timetable,
-          ...update.timetable,
-        }
-      : existing.timetable,
-    guestlist: update.guestlist
-      ? {
-          ...existing.guestlist,
-          ...update.guestlist,
-        }
-      : existing.guestlist,
-    budget: update.budget
-      ? {
-          ...existing.budget,
-          ...update.budget,
-        }
-      : existing.budget,
-    tickets: update.tickets
-      ? {
-          ...existing.tickets,
-          ...update.tickets,
-        }
-      : existing.tickets,
+    lineup: update.lineup ? { ...existing.lineup, ...update.lineup } : existing.lineup,
+    timetable: update.timetable ? { ...existing.timetable, ...update.timetable } : existing.timetable,
+    guestlist: update.guestlist ? { ...existing.guestlist, ...update.guestlist } : existing.guestlist,
+    budget: update.budget ? { ...existing.budget, ...update.budget } : existing.budget,
+    tickets: update.tickets ? { ...existing.tickets, ...update.tickets } : existing.tickets,
+    labels: update.labels ?? existing.labels,
+    applications: update.applications ?? existing.applications,
+    accessAssignments: update.accessAssignments ?? existing.accessAssignments,
   };
 }
 
@@ -292,24 +138,18 @@ function getUserById(id: string) {
   return storeState.users.find((user) => user.id === id);
 }
 
+function getCurrentConsumerUser() {
+  return storeState.users[0] ?? null;
+}
+
 function getArtistById(id: string) {
   return storeState.artists.find((artist) => artist.id === id);
 }
 
 function upsertArtists(nextArtists: ArtistProfile[]) {
-  const artistMap = new Map(storeState.artists.map((artist) => [artist.id, artist]));
-
-  nextArtists.forEach((artist) => {
-    const existing = artistMap.get(artist.id);
-    artistMap.set(artist.id, {
-      ...existing,
-      ...artist,
-    });
-  });
-
   updateState({
     ...storeState,
-    artists: Array.from(artistMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
+    artists: deriveArtists(storeState.events, [...storeState.artists, ...nextArtists]),
   });
 }
 
@@ -321,61 +161,93 @@ function createDraftEvent(overrides?: Partial<Event>) {
     events: [draft, ...storeState.events],
   });
 
+  void fetchJson<Event>("/api/store/events", {
+    method: "POST",
+    body: JSON.stringify(draft),
+  }).then((savedEvent) => {
+    updateState({
+      ...storeState,
+      events: storeState.events.map((event) => (event.id === savedEvent.id ? savedEvent : event)),
+    });
+  }).catch(() => {});
+
   return draft;
 }
 
 function updateEvent(update: EventUpdate) {
-  const nextEvents = storeState.events.map((event) =>
-    event.id === update.id
-      ? mergeEvent(event, {
-          ...update,
-          updatedAt: new Date().toISOString(),
-        })
-      : event
-  );
+  const existingEvent = getEventById(update.id);
+  if (!existingEvent) {
+    return null;
+  }
+
+  const nextEvent = mergeEvent(existingEvent, {
+    ...update,
+    updatedAt: new Date().toISOString(),
+  });
 
   updateState({
     ...storeState,
-    events: nextEvents,
+    events: storeState.events.map((event) => (event.id === update.id ? nextEvent : event)),
   });
 
-  return nextEvents.find((event) => event.id === update.id);
+  void fetchJson<Event>(`/api/store/events/${update.id}`, {
+    method: "PUT",
+    body: JSON.stringify(nextEvent),
+  }).then((savedEvent) => {
+    updateState({
+      ...storeState,
+      events: storeState.events.map((event) => (event.id === savedEvent.id ? savedEvent : event)),
+    });
+  }).catch(() => {});
+
+  return nextEvent;
 }
 
 function updateEventStatus(id: string, status: EventStatus) {
-  return updateEvent({
-    id,
-    status,
-  });
+  return updateEvent({ id, status });
 }
 
 function deleteEvent(id: string) {
-  const nextEvents = storeState.events.filter((event) => event.id !== id);
-
   updateState({
     ...storeState,
-    events: nextEvents,
+    events: storeState.events.filter((event) => event.id !== id),
   });
+
+  void fetch(`/api/store/events/${id}`, {
+    method: "DELETE",
+    cache: "no-store",
+  }).catch(() => {});
 }
 
 function updateUser(update: UserUpdate) {
-  const nextUsers = storeState.users.map((user) =>
-    user.id === update.id
-      ? {
-          ...user,
-          ...update,
-          username:
-            typeof update.username === "string" ? update.username.toLowerCase() : user.username,
-        }
-      : user,
-  );
+  const existingUser = getUserById(update.id);
+  if (!existingUser) {
+    return null;
+  }
+
+  const nextUser: ConsumerUser = {
+    ...existingUser,
+    ...update,
+    username:
+      typeof update.username === "string" ? update.username.toLowerCase() : existingUser.username,
+  };
 
   updateState({
     ...storeState,
-    users: nextUsers,
+    users: storeState.users.map((user) => (user.id === update.id ? nextUser : user)),
   });
 
-  return nextUsers.find((user) => user.id === update.id);
+  void fetchJson<ConsumerUser>(`/api/store/users/${update.id}`, {
+    method: "PUT",
+    body: JSON.stringify(nextUser),
+  }).then((savedUser) => {
+    updateState({
+      ...storeState,
+      users: storeState.users.map((user) => (user.id === savedUser.id ? savedUser : user)),
+    });
+  }).catch(() => {});
+
+  return nextUser;
 }
 
 function purchaseTicketSection({
@@ -402,34 +274,37 @@ function purchaseTicketSection({
   }
 
   const purchasedAt = new Date().toISOString();
-  const nextUsers = storeState.users.map((candidate) =>
-    candidate.id === userId
-      ? syncTicketPurchaseToUser(candidate, {
-          eventSlug: event.slug,
-          quantity,
-          accessGroupId: section.accessGroupId,
-          ticketLabel: section.name,
-          status: "active",
-        })
-      : candidate,
-  );
-  const nextEvents = storeState.events.map((candidate) =>
-    candidate.id === eventId
-      ? syncTicketPurchaseToEvent(candidate, {
-          userId,
-          accessGroupId: section.accessGroupId,
-          purchasedAt,
-        })
-      : candidate,
-  );
+  const nextEvent = syncTicketPurchaseToEvent(event, {
+    userId,
+    accessGroupId: section.accessGroupId,
+    purchasedAt,
+  });
+  const nextUser = syncTicketPurchaseToUser(user, {
+    eventSlug: event.slug,
+    quantity,
+    accessGroupId: section.accessGroupId,
+    ticketLabel: section.name,
+    status: "active",
+  });
 
   updateState({
     ...storeState,
-    users: nextUsers,
-    events: nextEvents,
+    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
+    users: storeState.users.map((candidate) => (candidate.id === userId ? nextUser : candidate)),
   });
 
-  return nextEvents.find((candidate) => candidate.id === eventId) ?? null;
+  void fetchJson<{ event: Event; user: ConsumerUser }>(`/api/store/events/${eventId}/purchase`, {
+    method: "POST",
+    body: JSON.stringify({ userId, sectionId, quantity }),
+  }).then(({ event: savedEvent, user: savedUser }) => {
+    updateState({
+      ...storeState,
+      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+      users: storeState.users.map((candidate) => (candidate.id === savedUser.id ? savedUser : candidate)),
+    });
+  }).catch(() => {});
+
+  return nextEvent;
 }
 
 function applyToCuratedEvent({
@@ -444,18 +319,23 @@ function applyToCuratedEvent({
     return null;
   }
 
-  const nextEvents = storeState.events.map((candidate) =>
-    candidate.id === eventId
-      ? applyToCuratedEventRecord(candidate, userId)
-      : candidate,
-  );
-
+  const nextEvent = applyToCuratedEventRecord(event, userId);
   updateState({
     ...storeState,
-    events: nextEvents,
+    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
   });
 
-  return nextEvents.find((candidate) => candidate.id === eventId) ?? null;
+  void fetchJson<Event>(`/api/store/events/${eventId}/applications/apply`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  }).then((savedEvent) => {
+    updateState({
+      ...storeState,
+      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    });
+  }).catch(() => {});
+
+  return nextEvent;
 }
 
 function approveCuratedApplication({
@@ -472,21 +352,27 @@ function approveCuratedApplication({
     return null;
   }
 
-  const nextEvents = storeState.events.map((candidate) =>
-    candidate.id === eventId
-      ? approveCuratedApplicationRecord(candidate, {
-          userId,
-          accessGroupId,
-        })
-      : candidate,
-  );
+  const nextEvent = approveCuratedApplicationRecord(event, {
+    userId,
+    accessGroupId,
+  });
 
   updateState({
     ...storeState,
-    events: nextEvents,
+    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
   });
 
-  return nextEvents.find((candidate) => candidate.id === eventId) ?? null;
+  void fetchJson<Event>(`/api/store/events/${eventId}/applications/${userId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ accessGroupId }),
+  }).then((savedEvent) => {
+    updateState({
+      ...storeState,
+      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    });
+  }).catch(() => {});
+
+  return nextEvent;
 }
 
 function denyCuratedApplication({
@@ -501,43 +387,49 @@ function denyCuratedApplication({
     return null;
   }
 
-  const nextEvents = storeState.events.map((candidate) =>
-    candidate.id === eventId
-      ? denyCuratedApplicationRecord(candidate, {
-          userId,
-        })
-      : candidate,
-  );
+  const nextEvent = denyCuratedApplicationRecord(event, {
+    userId,
+  });
 
   updateState({
     ...storeState,
-    events: nextEvents,
+    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
   });
 
-  return nextEvents.find((candidate) => candidate.id === eventId) ?? null;
+  void fetchJson<Event>(`/api/store/events/${eventId}/applications/${userId}/deny`, {
+    method: "POST",
+  }).then((savedEvent) => {
+    updateState({
+      ...storeState,
+      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    });
+  }).catch(() => {});
+
+  return nextEvent;
 }
 
 function resetMockData() {
   updateState(getInitialStoreState());
+  hasBootstrapped = false;
+  void bootstrapFromDb().then(() => {
+    hasBootstrapped = true;
+  }).catch(() => {
+    hasBootstrapped = false;
+  });
 }
 
 export function useMockEventsStore() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    const persistedState = readPersistedState();
-
-    if (!persistedState) {
+    if (hasBootstrapped) {
       return;
     }
 
-    const normalizedState = normalizePersistedState(persistedState);
-    const nextSerialized = JSON.stringify(normalizedState);
-    const currentSerialized = JSON.stringify(storeState);
-
-    if (nextSerialized !== currentSerialized) {
-      updateState(normalizedState);
-    }
+    hasBootstrapped = true;
+    void bootstrapFromDb().catch(() => {
+      hasBootstrapped = false;
+    });
   }, []);
 
   return {
@@ -546,6 +438,7 @@ export function useMockEventsStore() {
     getEventBySlug,
     getEventsByStatus,
     getUserById,
+    getCurrentConsumerUser,
     getArtistById,
     createDraftEvent,
     updateEvent,

@@ -10,12 +10,13 @@ export function TopNav() {
           <Link href="/" aria-label="Go to home">
             <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
           </Link>
-          <div
-            className="text-title uppercase tracking-[0.14em]"
-            style={{ fontFamily: "var(--font-space-grotesk)", color: "#FFFFFF", fontWeight: 400 }}
-          >
-            KUSPACE
-          </div>
+          <Link href="/" aria-label="Go to home" className="ml-1 shrink-0">
+            <img
+              src="/title-logo.svg"
+              alt="KUSPACE"
+              className="block h-10 w-auto translate-y-[3px]"
+            />
+          </Link>
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-3 md:w-auto md:flex-nowrap">

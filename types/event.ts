@@ -227,6 +227,7 @@ export interface Event {
   admissionMode: AdmissionMode;
   createdAt: string;
   updatedAt: string;
+  // Canonical event owner / editor.
   recruiterProfileId: string;
 
   cover: EventCoverSection;
@@ -237,6 +238,8 @@ export interface Event {
   applications: EventApplication[];
   budget: EventBudgetSection;
   tickets: EventTicketsSection;
+  // Attached event brands / labels. Kept separate from recruiterProfileId
+  // even when the owner recruiter is also the only label for MVP.
   labels?: EventLabel[];
 }
 

@@ -4,13 +4,24 @@ import type {
   EventApplication,
   EventAccessPaymentState,
   GuestlistEntry,
-  TicketSection,
 } from "@/types/event";
 import type {
   ConsumerTicketStatus,
   ConsumerUser,
   ConsumerTicketWalletEntry,
 } from "@/types/user";
+import {
+  deriveConsumerTicketStatusFromAssignment,
+  isQrActiveForAssignment,
+  isQrActiveForPaymentState,
+} from "@/lib/event-access-assignment";
+import {
+  buildEventApplicationRecord,
+  canUseEventApplications,
+} from "@/lib/event-applications";
+import {
+  getVisibleTicketSectionsForAssignment,
+} from "@/lib/event-ticket-visibility";
 
 export function getEventAccessAssignment(
   event: Event,
@@ -26,24 +37,6 @@ export function getEventApplication(
   return event.applications.find((application) => application.userId === userId);
 }
 
-export function isQrActiveForPaymentState(paymentState: EventAccessPaymentState) {
-  return (
-    paymentState === "paid" ||
-    paymentState === "not_required" ||
-    paymentState === "waived"
-  );
-}
-
-export function isQrActiveForAssignment(
-  assignment: EventAccessAssignment | undefined,
-) {
-  if (!assignment) {
-    return false;
-  }
-
-  return isQrActiveForPaymentState(assignment.paymentState);
-}
-
 export function getConsumerTicketStatus(params: {
   walletStatus?: ConsumerTicketStatus;
   assignment?: EventAccessAssignment;
@@ -54,30 +47,7 @@ export function getConsumerTicketStatus(params: {
     return walletStatus;
   }
 
-  if (assignment?.checkedIn) {
-    return "scanned";
-  }
-
-  return isQrActiveForAssignment(assignment) ? "active" : "inactive";
-}
-
-export function canUserSeeTicketSection(
-  section: TicketSection,
-  assignment: EventAccessAssignment | undefined,
-) {
-  if (section.visibility === "hidden") {
-    return false;
-  }
-
-  if (section.visibility === "public") {
-    return true;
-  }
-
-  if (!assignment) {
-    return false;
-  }
-
-  return section.allowedGroupIds.includes(assignment.accessGroupId);
+  return deriveConsumerTicketStatusFromAssignment(assignment) ?? "inactive";
 }
 
 export function getVisibleTicketSectionsForUser(
@@ -85,15 +55,7 @@ export function getVisibleTicketSectionsForUser(
   userId?: string,
 ) {
   const assignment = userId ? getEventAccessAssignment(event, userId) : undefined;
-
-  if (event.admissionMode === "curated" && !assignment) {
-    return [];
-  }
-
-  return (event.tickets.sections ?? []).filter(
-    (section) =>
-      section.phases.length > 0 && canUserSeeTicketSection(section, assignment),
-  );
+  return getVisibleTicketSectionsForAssignment(event, assignment);
 }
 
 export function resolveManualAssignmentPaymentState(
@@ -238,17 +200,18 @@ export function applyToCuratedEvent(
   userId: string,
   appliedAt = new Date().toISOString(),
 ): Event {
+  if (!canUseEventApplications(event)) {
+    return event;
+  }
+
   const existingApplication = getEventApplication(event, userId);
-  const nextApplication: EventApplication = {
+  const nextApplication: EventApplication = buildEventApplicationRecord({
     eventId: event.id,
     userId,
     status: "pending",
     appliedAt: existingApplication?.appliedAt ?? appliedAt,
-    reviewedAt: undefined,
-    reviewedBy: undefined,
-    accessGroupId: undefined,
     notes: existingApplication?.notes,
-  };
+  });
 
   return {
     ...event,
@@ -268,6 +231,10 @@ export function approveCuratedApplication(
     reviewedBy?: string;
   },
 ): Event {
+  if (!canUseEventApplications(event)) {
+    return event;
+  }
+
   const reviewedAt = approval.reviewedAt ?? new Date().toISOString();
   const existingApplication = getEventApplication(event, approval.userId);
   const paymentState = resolveManualAssignmentPaymentState(event, approval.accessGroupId);
@@ -315,7 +282,7 @@ export function approveCuratedApplication(
     accessAssignments: nextAssignments,
     applications: [
       ...event.applications.filter((application) => application.userId !== approval.userId),
-      {
+      buildEventApplicationRecord({
         eventId: event.id,
         userId: approval.userId,
         status: "accepted",
@@ -324,7 +291,7 @@ export function approveCuratedApplication(
         reviewedBy: approval.reviewedBy,
         accessGroupId: approval.accessGroupId,
         notes: existingApplication?.notes,
-      },
+      }),
     ],
   };
 }
@@ -337,6 +304,10 @@ export function denyCuratedApplication(
     reviewedBy?: string;
   },
 ): Event {
+  if (!canUseEventApplications(event)) {
+    return event;
+  }
+
   const reviewedAt = denial.reviewedAt ?? new Date().toISOString();
   const existingApplication = getEventApplication(event, denial.userId);
 
@@ -344,7 +315,7 @@ export function denyCuratedApplication(
     ...event,
     applications: [
       ...event.applications.filter((application) => application.userId !== denial.userId),
-      {
+      buildEventApplicationRecord({
         eventId: event.id,
         userId: denial.userId,
         status: "denied",
@@ -353,7 +324,7 @@ export function denyCuratedApplication(
         reviewedBy: denial.reviewedBy,
         accessGroupId: existingApplication?.accessGroupId,
         notes: existingApplication?.notes,
-      },
+      }),
     ],
   };
 }

@@ -9,7 +9,6 @@ import {
   getEventAccessAssignment,
 } from "@/lib/event-access";
 import { canConsumerAccessEvent } from "@/lib/event-status";
-import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
 import { formatFullEventDate } from "@/lib/utils/date";
 import type { ConsumerTicketStatus, ConsumerTicketWalletEntry } from "@/types/user";
@@ -399,14 +398,14 @@ function TicketSectionBlock({
 }
 
 export function ConsumerTicketsPage() {
-  const { users, events } = useMockEventsStore();
+  const { users, events, getCurrentConsumerUser } = useMockEventsStore();
   const [activeSection, setActiveSection] = useState<TicketSection>("upcoming");
   const [selectedEntrySlug, setSelectedEntrySlug] = useState<string | null>(null);
 
-  const currentUser = users.find((user) => user.id === defaultConsumerUserId) ?? users[0];
+  const currentUser = getCurrentConsumerUser();
   const ticketEntries = useMemo(
-    () => currentUser.ticketWalletEntries ?? [],
-    [currentUser.ticketWalletEntries],
+    () => currentUser?.ticketWalletEntries ?? [],
+    [currentUser?.ticketWalletEntries],
   );
 
   const ticketCards = useMemo(
@@ -418,7 +417,9 @@ export function ConsumerTicketsPage() {
             return null;
           }
 
-          const assignment = getEventAccessAssignment(event, currentUser.id);
+          const assignment = currentUser
+            ? getEventAccessAssignment(event, currentUser.id)
+            : undefined;
 
           const groupName =
             event.guestlist.accessGroups.find(
@@ -443,7 +444,7 @@ export function ConsumerTicketsPage() {
           const rightTime = new Date(`${right.event.cover.date}T00:00:00.000Z`).getTime();
           return leftTime - rightTime;
         }),
-    [currentUser.id, events, ticketEntries],
+    [currentUser?.id, events, ticketEntries],
   );
 
   const upcomingCards = ticketCards
@@ -467,6 +468,7 @@ export function ConsumerTicketsPage() {
     ? ticketCards.filter(({ event }) => event.slug === selectedEntrySlug)
     : [];
   const selectedCard = selectedCards[0] ?? null;
+  const isHydrating = users.length === 0;
 
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -518,6 +520,12 @@ export function ConsumerTicketsPage() {
                 onViewTicket={setSelectedEntrySlug}
                 sortDirection={activeSection === "upcoming" ? "asc" : "desc"}
               />
+
+              {isHydrating ? (
+                <div className="rounded-[var(--radius-surface)] border border-dashed border-border bg-panel px-4 py-5">
+                  <p className="text-body text-muted">Loading tickets…</p>
+                </div>
+              ) : null}
             </div>
           </section>
         </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { GlobalSearchOverlay } from "@/components/layout/global-search-overlay";
+import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
 import { useMockEventsStore } from "@/lib/mock-store";
@@ -48,7 +49,7 @@ export function RecruiterTopNav({
   const labels = Array.from(
     new Map(
       events
-        .flatMap((event) => event.labels ?? [])
+        .flatMap((event) => resolveEventLabels(event, profile))
         .map((label) => [
           label.id,
           {
@@ -68,12 +69,12 @@ export function RecruiterTopNav({
           <Link href="/rechome" aria-label="Go to home">
             <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
           </Link>
-          <Link
-            href="/rechome"
-            className="text-title tracking-[0.14em] transition hover:opacity-90"
-            style={{ fontFamily: "var(--font-space-grotesk)", color: "#FFFFFF", fontWeight: 400 }}
-          >
-            KUSPACE
+          <Link href="/rechome" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
+            <img
+              src="/title-logo.svg"
+              alt="KUSPACE"
+              className="block h-10 w-auto translate-y-[3px]"
+            />
           </Link>
         </div>
 

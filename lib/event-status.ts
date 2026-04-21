@@ -10,15 +10,15 @@ export const PUBLIC_ADMISSION_MODE = "public" as const satisfies AdmissionMode;
 export const CURATED_ADMISSION_MODE = "curated" as const satisfies AdmissionMode;
 
 export function isLockedEventStatus(status: EventStatus) {
-  return LOCKED_EVENT_STATUSES.includes(status);
+  return (LOCKED_EVENT_STATUSES as readonly EventStatus[]).includes(status);
 }
 
 export function isPublicEventStatus(status: EventStatus) {
-  return PUBLIC_EVENT_STATUSES.includes(status);
+  return (PUBLIC_EVENT_STATUSES as readonly EventStatus[]).includes(status);
 }
 
 export function isInternalPreviewEventStatus(status: EventStatus) {
-  return INTERNAL_PREVIEW_EVENT_STATUSES.includes(status);
+  return (INTERNAL_PREVIEW_EVENT_STATUSES as readonly EventStatus[]).includes(status);
 }
 
 export function isPublicAdmissionMode(admissionMode: AdmissionMode) {

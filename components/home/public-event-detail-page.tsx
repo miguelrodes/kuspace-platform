@@ -17,12 +17,12 @@ import {
 } from "@/lib/event-status";
 import { formatCompactEventDate } from "@/lib/utils/date";
 import {
-  canUserSeeTicketSection,
   getEventAccessAssignment,
   getEventApplication,
 } from "@/lib/event-access";
-import { defaultConsumerUserId } from "@/lib/mock-data";
 import { useMockEventsStore } from "@/lib/mock-store";
+import { resolveEventLabels } from "@/lib/event-labels";
+import { getVisibleTicketSectionsForAssignment } from "@/lib/event-ticket-visibility";
 import { formatTimeRange } from "@/lib/utils/date";
 import type { Event, TicketSection } from "@/types/event";
 
@@ -193,6 +193,7 @@ export function PublicEventDetailPage({
     users,
     events,
     getEventBySlug,
+    getCurrentConsumerUser,
     applyToCuratedEvent,
     purchaseTicketSection,
   } = useMockEventsStore();
@@ -204,7 +205,7 @@ export function PublicEventDetailPage({
   const [showApplyDialog, setShowApplyDialog] = useState(false);
 
   const event = getEventBySlug(slug);
-  const currentConsumer = users.find((user) => user.id === defaultConsumerUserId) ?? users[0];
+  const currentConsumer = getCurrentConsumerUser();
 
   useEffect(() => {
     if (!event) {
@@ -303,16 +304,7 @@ export function PublicEventDetailPage({
     );
   }
 
-  const labels = event.labels?.length
-    ? event.labels
-    : [
-        {
-          id: recruiter.id,
-          name: recruiter.displayName,
-          profileSlug: recruiter.slug,
-          avatarImageUrl: recruiter.media?.avatarImageUrl,
-        },
-      ];
+  const labels = resolveEventLabels(event, recruiter);
   const recruiterProfileHref =
     audience === "recruiter"
       ? `/recprofile/${recruiter.slug}`
@@ -324,17 +316,7 @@ export function PublicEventDetailPage({
 
   const visibleTicketSections =
     audience === "consumer"
-      ? (event.tickets.sections ?? []).filter((section) => {
-          if (section.phases.length === 0) {
-            return false;
-          }
-
-          if (event.admissionMode === "curated" && !currentAssignment) {
-            return false;
-          }
-
-          return canUserSeeTicketSection(section, currentAssignment);
-        })
+      ? getVisibleTicketSectionsForAssignment(event, currentAssignment)
       : (event.tickets.sections ?? []).filter(
           (section) => section.visibility === "public" && section.phases.length > 0,
         );

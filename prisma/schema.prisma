@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum EventStatus {
@@ -131,6 +132,7 @@ model RecruiterProfile {
   labels              EventLabel[]            @relation("LabelRecruiterProfile")
 
   @@index([recruiterType])
+  @@map("recruiter_profiles")
 }
 
 model RecruiterProfileStats {
@@ -144,6 +146,8 @@ model RecruiterProfileStats {
   displayFollowers    Boolean          @default(true)
   displayPublicRating Boolean          @default(true)
   recruiterProfile    RecruiterProfile @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
+
+  @@map("recruiter_profile_stats")
 }
 
 model RecruiterSoundProfile {
@@ -154,6 +158,8 @@ model RecruiterSoundProfile {
   recruiterProfile  RecruiterProfile             @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
   genres            RecruiterSoundProfileGenre[]
   rooms             RecruiterSoundProfileRoom[]
+
+  @@map("recruiter_sound_profiles")
 }
 
 model RecruiterSoundProfileGenre {
@@ -164,6 +170,7 @@ model RecruiterSoundProfileGenre {
   recruiterSoundProfile RecruiterSoundProfile @relation(fields: [recruiterSoundProfileId], references: [id], onDelete: Cascade)
 
   @@unique([recruiterSoundProfileId, sortOrder])
+  @@map("recruiter_sound_profile_genres")
 }
 
 model RecruiterSoundProfileRoom {
@@ -175,6 +182,7 @@ model RecruiterSoundProfileRoom {
   recruiterSoundProfile RecruiterSoundProfile @relation(fields: [recruiterSoundProfileId], references: [id], onDelete: Cascade)
 
   @@unique([recruiterSoundProfileId, sortOrder])
+  @@map("recruiter_sound_profile_rooms")
 }
 
 model ConsumerUser {
@@ -198,6 +206,8 @@ model ConsumerUser {
   eventAccessAssignments EventAccessAssignment[]
   eventApplications      EventApplication[]
   guestlistEntries       GuestlistEntry[]
+
+  @@map("consumer_users")
 }
 
 model ConsumerUserFavoriteGenre {
@@ -208,55 +218,69 @@ model ConsumerUserFavoriteGenre {
   consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
 
   @@unique([consumerUserId, sortOrder])
+  @@map("consumer_user_favorite_genres")
 }
 
 model ConsumerUserSavedEvent {
   id             String       @id @default(uuid())
   consumerUserId String
-  eventId        String
+  eventSlug      String
   createdAt      DateTime     @default(now())
   consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
-  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventSlug], references: [slug], onDelete: Cascade)
 
-  @@unique([consumerUserId, eventId])
+  @@unique([consumerUserId, eventSlug])
+  @@map("consumer_user_saved_events")
 }
 
 model ConsumerUserUpcomingTicketEvent {
   id             String       @id @default(uuid())
   consumerUserId String
-  eventId        String
+  eventSlug      String
   createdAt      DateTime     @default(now())
   consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
-  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventSlug], references: [slug], onDelete: Cascade)
 
-  @@unique([consumerUserId, eventId])
+  @@unique([consumerUserId, eventSlug])
+  @@map("consumer_user_upcoming_ticket_events")
 }
 
 model ConsumerUserPastTicketEvent {
   id             String       @id @default(uuid())
   consumerUserId String
-  eventId        String
+  eventSlug      String
   createdAt      DateTime     @default(now())
   consumerUser   ConsumerUser @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
-  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventSlug], references: [slug], onDelete: Cascade)
 
-  @@unique([consumerUserId, eventId])
+  @@unique([consumerUserId, eventSlug])
+  @@map("consumer_user_past_ticket_events")
 }
 
+/// Wallet entries preserve explicitly stored consumer ticket status.
+/// If status is null, app code may derive a fallback from access assignment state.
 model ConsumerTicketWalletEntry {
   id            String               @id @default(uuid())
   consumerUserId String
-  eventId       String
+  eventSlug     String
   accessGroupId String
   quantity      Int
   ticketLabel   String?
   status        ConsumerTicketStatus?
   createdAt     DateTime             @default(now())
   consumerUser  ConsumerUser         @relation(fields: [consumerUserId], references: [id], onDelete: Cascade)
-  event         Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event         Event                @relation(fields: [eventSlug], references: [slug], onDelete: Cascade)
   accessGroup   AccessGroup          @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
+
+  @@index([consumerUserId, eventSlug])
+  @@map("consumer_ticket_wallet_entries")
 }
 
+/// Event is the aggregate root.
+/// Section data is persisted in normalized related tables rather than a single event blob:
+/// cover fields live directly on Event, while lineup, timetable, guestlist,
+/// access assignments, applications, budget, tickets, and labels live in
+/// dedicated child/link tables.
 model Event {
   id                String                    @id @default(uuid())
   slug              String                    @unique
@@ -265,13 +289,21 @@ model Event {
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
   recruiterProfileId String
+  /// Cover fields persisted directly on Event.
   title             String
   description       String?
   shortDescription  String?
+  /// Supports event-level genres or room-level genres.
   genreDisplayMode  EventDisplayMode?
+  /// Top-level lineup section display mode from the current app model.
+  lineupDisplayMode EventDisplayMode?
   date              DateTime
+  /// Cover time range is stored as separate start/end values for now.
   timeStart         String?
   timeEnd           String?
+  /// Timetable section-level global range, kept separate from cover time.
+  timetableStartTime String?
+  timetableEndTime   String?
   imageUrl          String
   imageAlt          String
   location          String
@@ -280,6 +312,8 @@ model Event {
   eventType         EventType
   roomSize          Int
   numberOfRooms     Int?
+  /// Event budget section headline value. Derived UI metrics like paid,
+  /// unpaid, remaining, and totals should still come from BudgetItem rows.
   totalBudget       Decimal                   @default(0) @db.Decimal(12, 2)
   recruiterProfile  RecruiterProfile          @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
   genres            EventGenre[]
@@ -302,6 +336,10 @@ model Event {
   @@index([admissionMode])
   @@index([recruiterProfileId, status])
   @@index([admissionMode, status])
+  @@index([recruiterProfileId])
+  @@index([date])
+  @@index([slug, status])
+  @@map("events")
 }
 
 model EventGenre {
@@ -312,11 +350,14 @@ model EventGenre {
   event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@map("event_genres")
 }
 
 model EventRoom {
   id        String           @id @default(uuid())
   eventId   String
+  /// Stable UI/migration key from the current client model.
   clientKey String?
   name      String
   capacity  Int
@@ -325,8 +366,14 @@ model EventRoom {
   genres    EventRoomGenre[]
   lineupRooms LineupEntryRoom[]
   timetableRows TimetableRow[]
+
+  @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@index([clientKey])
+  @@map("event_rooms")
 }
 
+/// Room-level genres for Event.cover.rooms[].genres when genreDisplayMode is "room".
 model EventRoomGenre {
   id          String    @id @default(uuid())
   eventRoomId String
@@ -335,11 +382,14 @@ model EventRoomGenre {
   eventRoom   EventRoom @relation(fields: [eventRoomId], references: [id], onDelete: Cascade)
 
   @@unique([eventRoomId, sortOrder])
+  @@index([eventRoomId])
+  @@map("event_room_genres")
 }
 
 model LineupEntry {
   id        String            @id @default(uuid())
   eventId   String
+  /// Stable UI/migration key from the current client model.
   clientKey String?
   artistId  String
   name      String
@@ -348,8 +398,17 @@ model LineupEntry {
   event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   roomLinks LineupEntryRoom[]
   timetableRows TimetableRow[]
+
+  @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@index([artistId])
+  @@index([clientKey])
+  @@map("event_lineup_entries")
 }
 
+/// Join table so one lineup entry can belong to multiple rooms.
+/// This preserves current app support for roomId and roomIds without assuming
+/// a single-room lineup model in persistence.
 model LineupEntryRoom {
   lineupEntryId String
   eventRoomId   String
@@ -357,15 +416,19 @@ model LineupEntryRoom {
   eventRoom     EventRoom   @relation(fields: [eventRoomId], references: [id], onDelete: Cascade)
 
   @@id([lineupEntryId, eventRoomId])
+  @@index([eventRoomId])
+  @@map("event_lineup_entry_rooms")
 }
 
 model TimetableRow {
   id            String      @id @default(uuid())
   eventId       String
+  /// Stable UI/migration key from the current client model.
   clientKey     String?
   title         String
   lineupEntryId String?
   eventRoomId   String?
+  /// Optional fallback room label from the current client model.
   roomName      String?
   notes         String?
   startTime     String
@@ -374,8 +437,18 @@ model TimetableRow {
   event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   lineupEntry   LineupEntry? @relation(fields: [lineupEntryId], references: [id], onDelete: SetNull)
   eventRoom     EventRoom?   @relation(fields: [eventRoomId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@index([eventRoomId])
+  @@index([lineupEntryId])
+  @@index([clientKey])
+  @@map("event_timetable_rows")
 }
 
+/// Event-scoped access groups are the canonical replacement for the old
+/// guestlist-group concept. UI copy may still say "Guestlist" in places,
+/// but persistence and access logic should use access-group semantics.
 model AccessGroup {
   id                String                    @id @default(uuid())
   eventId           String
@@ -391,8 +464,14 @@ model AccessGroup {
   walletEntries     ConsumerTicketWalletEntry[]
 
   @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@map("event_access_groups")
 }
 
+/// Event access assignments are the source-of-truth access record for a user
+/// within an event. In practice there is one assignment per user per event.
+/// QR activity is derived from paymentState, and checkedIn implies a scanned
+/// consumer ticket state in downstream app logic.
 model EventAccessAssignment {
   id            String                       @id @default(uuid())
   eventId       String
@@ -409,8 +488,15 @@ model EventAccessAssignment {
   accessGroup   AccessGroup                  @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
 
   @@unique([eventId, consumerUserId])
+  @@index([eventId])
+  @@index([consumerUserId])
+  @@index([accessGroupId])
+  @@map("event_access_assignments")
 }
 
+/// Curated-event applications are persisted separately from access assignments.
+/// Only curated events should use this model. Accepted applications can then
+/// lead to an EventAccessAssignment, but the application record remains distinct.
 model EventApplication {
   id            String                 @id @default(uuid())
   eventId       String
@@ -426,8 +512,16 @@ model EventApplication {
   accessGroup   AccessGroup?           @relation(fields: [accessGroupId], references: [id], onDelete: SetNull)
 
   @@unique([eventId, consumerUserId])
+  @@index([eventId])
+  @@index([consumerUserId])
+  @@index([accessGroupId])
+  @@map("event_applications")
 }
 
+/// Guestlist entries remain a separate operational layer for recruiter workflows.
+/// They should not replace EventAccessAssignment as the access/payment source of truth.
+/// User entries can point to a consumer user, while manual entries can store names
+/// directly and optionally resolve to a user later.
 model GuestlistEntry {
   id            String              @id @default(uuid())
   eventId       String
@@ -442,11 +536,20 @@ model GuestlistEntry {
   event         Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
   accessGroup   AccessGroup         @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
   consumerUser  ConsumerUser?       @relation(fields: [consumerUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([accessGroupId])
+  @@index([consumerUserId])
+  @@map("event_guestlist_entries")
 }
 
+/// Budget items are the canonical line-level budget records for an event.
+/// UI totals should be derived from these rows rather than stored redundantly,
+/// unless a later caching layer is intentionally introduced.
 model BudgetItem {
   id        String  @id @default(uuid())
   eventId   String
+  /// Stable UI/migration key from the current client model.
   clientKey String?
   category  String
   title     String
@@ -455,8 +558,16 @@ model BudgetItem {
   notes     String?
   sortOrder Int
   event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@map("event_budget_items")
 }
 
+/// Ticket sections follow the current code model exactly.
+/// accessGroupId is the group this section belongs to and that purchase assigns into.
+/// allowedGroups is only meaningful for restricted visibility and controls who can
+/// see the section.
 model TicketSection {
   id                String                    @id @default(uuid())
   eventId           String
@@ -471,8 +582,12 @@ model TicketSection {
   phases            TicketTier[]
 
   @@unique([eventId, sortOrder])
+  @@index([eventId])
+  @@index([accessGroupId])
+  @@map("event_ticket_sections")
 }
 
+/// Normalized join table for TicketSection.allowedGroupIds.
 model TicketSectionAllowedGroup {
   ticketSectionId String
   accessGroupId   String
@@ -480,14 +595,20 @@ model TicketSectionAllowedGroup {
   accessGroup     AccessGroup   @relation(fields: [accessGroupId], references: [id], onDelete: Cascade)
 
   @@id([ticketSectionId, accessGroupId])
+  @@index([accessGroupId])
+  @@map("event_ticket_section_allowed_groups")
 }
 
 /// Canonical ticket persistence is section-based:
 /// Event -> TicketSection -> TicketTier.
 /// The legacy top-level event.tickets.tiers array remains an app compatibility layer only.
+/// Sold-out phases remain persisted rather than being deleted.
+/// Release scheduling and chained release behavior are modeled via salesStart,
+/// salesEnd, releaseMode, and releaseAfterTierId.
 model TicketTier {
   id                 String               @id @default(uuid())
   ticketSectionId    String
+  /// Stable UI/migration key from the current client model.
   clientKey          String?
   name               String
   price              Decimal              @db.Decimal(12, 2)
@@ -505,8 +626,17 @@ model TicketTier {
   releasesNext       TicketTier[]         @relation("TicketTierReleaseChain")
 
   @@unique([ticketSectionId, sortOrder])
+  @@index([ticketSectionId])
+  @@index([releaseAfterTierId])
+  @@index([clientKey])
+  @@index([status])
+  @@map("event_ticket_tiers")
 }
 
+/// Event labels are normalized separately from Event so one event can attach
+/// multiple label identities. A label can optionally resolve to a recruiter
+/// profile, which keeps event pages clickable without forcing label data into
+/// the Event row itself.
 model EventLabel {
   id                 String            @id @default(uuid())
   name               String
@@ -515,8 +645,15 @@ model EventLabel {
   recruiterProfileId String?
   recruiterProfile   RecruiterProfile? @relation("LabelRecruiterProfile", fields: [recruiterProfileId], references: [id], onDelete: SetNull)
   eventLinks         EventLabelLink[]
+
+  @@index([name])
+  @@index([recruiterProfileId])
+  @@index([profileSlug])
+  @@map("event_labels")
 }
 
+/// Event-to-label attachment join table so events can have multiple labels
+/// while preserving ordering on the public event page.
 model EventLabelLink {
   eventId    String
   eventLabelId String
@@ -525,4 +662,7 @@ model EventLabelLink {
   eventLabel EventLabel @relation(fields: [eventLabelId], references: [id], onDelete: Cascade)
 
   @@id([eventId, eventLabelId])
+  @@unique([eventId, sortOrder])
+  @@index([eventLabelId])
+  @@map("event_label_links")
 }
