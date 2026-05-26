@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { GlobalSearchOverlay } from "@/components/layout/global-search-overlay";
+import { MutationErrorBanner } from "@/components/ui/mutation-error-banner";
 import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
@@ -20,58 +21,77 @@ export function PublicTopNav({
 }: PublicTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { events, profile } = useMockEventsStore();
+  const { events, profile, mutationError, clearMutationError } = useMockEventsStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const navItems = [
-    {
-      href: "/",
-      label: "Home",
-      active: pathname === "/" || pathname.startsWith("/events") || pathname.startsWith("/cons/events"),
-    },
-    {
-      href: "/cons/tickets",
-      label: "Tickets",
-      active: pathname === "/tickets" || pathname.startsWith("/cons/tickets"),
-    },
-    {
-      href: "/cons/profile/me",
-      label: "Profile",
-      active:
-        pathname === "/consprofile" ||
-        pathname === "/cons/profile/me",
-    },
-  ];
+  const navItems = useMemo(
+    () => [
+      {
+        href: "/conshome",
+        label: "Home",
+        active: pathname === "/conshome" || pathname.startsWith("/events") || pathname.startsWith("/cons/events"),
+      },
+      {
+        href: "/cons/tickets",
+        label: "Tickets",
+        active: pathname === "/tickets" || pathname.startsWith("/cons/tickets"),
+      },
+      {
+        href: "/cons/profile/me",
+        label: "Profile",
+        active:
+          pathname === "/consprofile" ||
+          pathname === "/cons/profile/me",
+      },
+    ],
+    [pathname],
+  );
 
   const handleNavigate = (href: string) => {
     setIsSearchOpen(false);
     router.push(href);
   };
 
-  const labels = Array.from(
-    new Map(
-      events
-        .flatMap((event) => resolveEventLabels(event, profile))
-        .map((label) => [
-          label.id,
-          {
-            id: label.id,
-            name: label.name,
-            avatarImageUrl: label.avatarImageUrl,
-            href: label.profileSlug ? `/cons/profile/${label.profileSlug}` : undefined,
-          },
-        ]),
-    ).values(),
+  const publicEvents = useMemo(() => getPublicEventCollection(events), [events]);
+  const labels = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          events
+            .flatMap((event) => resolveEventLabels(event, profile))
+            .map((label) => [
+              label.id,
+              {
+                id: label.id,
+                name: label.name,
+                avatarImageUrl: label.avatarImageUrl,
+                href: label.profileSlug ? `/cons/profile/${label.profileSlug}` : undefined,
+              },
+            ]),
+        ).values(),
+      ),
+    [events, profile],
+  );
+  const nightclubs = useMemo(
+    () => [
+      {
+        id: profile.id,
+        name: profile.displayName,
+        slug: profile.slug,
+        avatarImageUrl: profile.media?.avatarImageUrl,
+      },
+    ],
+    [profile.displayName, profile.id, profile.media?.avatarImageUrl, profile.slug],
   );
 
   return (
     <header className="border-b border-border bg-panel px-4 pb-2 pt-3 md:px-6">
       <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-2 md:items-end">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/" aria-label="Go to home">
+          <Link href="/conshome" aria-label="Go to home">
             <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
           </Link>
-          <Link href="/" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
+          <Link href="/conshome" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
             <img
               src="/title-logo.svg"
               alt="KUSPACE"
@@ -126,20 +146,19 @@ export function PublicTopNav({
       <GlobalSearchOverlay
         open={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        events={getPublicEventCollection(events)}
-        nightclubs={[
-          {
-            id: profile.id,
-            name: profile.displayName,
-            slug: profile.slug,
-            avatarImageUrl: profile.media?.avatarImageUrl,
-          },
-        ]}
+        events={publicEvents}
+        nightclubs={nightclubs}
         labels={labels}
         eventHrefFor={(event) => `/cons/events/${event.slug}`}
         nightclubHrefFor={(nightclub) => `/cons/profile/${nightclub.slug}`}
         onNavigate={handleNavigate}
       />
+      {mutationError ? (
+        <MutationErrorBanner
+          message={mutationError.message}
+          onDismiss={clearMutationError}
+        />
+      ) : null}
     </header>
   );
 }

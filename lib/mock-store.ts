@@ -2,9 +2,10 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import type { ArtistProfile, Event, EventAccessAssignment, EventStatus } from "@/types/event";
+import type { TicketCheckoutIntentResult, TicketOrderPaymentTransitionResult } from "@/types/checkout";
 import type { RecruiterProfile } from "@/types/profile";
 import type { ConsumerUser } from "@/types/user";
-import { createDraftEventSeed } from "@/lib/event-draft";
+import type { WorkspaceMembership, WorkspaceOrganization } from "@/types/workspace";
 import {
   applyToCuratedEvent as applyToCuratedEventRecord,
   approveCuratedApplication as approveCuratedApplicationRecord,
@@ -12,16 +13,58 @@ import {
   syncTicketPurchaseToEvent,
   syncTicketPurchaseToUser,
 } from "@/lib/event-access";
+import { isApiErrorPayload } from "@/lib/http/contracts";
+
+type StoreMutationError = {
+  message: string;
+  code: string;
+  status: number;
+};
+
+class ClientApiError extends Error {
+  status: number;
+  code: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, code: string, details?: unknown) {
+    super(message);
+    this.name = "ClientApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
 
 type MockStoreState = {
   profile: RecruiterProfile;
   users: ConsumerUser[];
   artists: ArtistProfile[];
   events: Event[];
+  currentRole: "consumer" | "recruiter" | null;
+  currentConsumerUserId: string | null;
+  currentRecruiterProfileId: string | null;
+  currentOrganizationId: string | null;
+  currentOrganizationRole: "owner" | "member" | null;
+  currentOrganization: WorkspaceOrganization | null;
+  organizations?: WorkspaceMembership[];
+  needsActorSelection: boolean;
+  needsOrganizationSetup?: boolean;
+  mutationError: StoreMutationError | null;
 };
 
 type EventUpdate = Partial<Event> & Pick<Event, "id">;
 type UserUpdate = Partial<ConsumerUser> & Pick<ConsumerUser, "id">;
+type EventEditorSectionUpdate = {
+  id: string;
+  slug: string;
+  admissionMode: Event["admissionMode"];
+  cover: Event["cover"];
+  lineup: Event["lineup"];
+  timetable: Event["timetable"];
+  guestlist: Event["guestlist"];
+  budget: Event["budget"];
+  tickets: Event["tickets"];
+};
 
 const EMPTY_PROFILE: RecruiterProfile = {
   id: "",
@@ -36,6 +79,16 @@ function getInitialStoreState(): MockStoreState {
     users: [],
     artists: [],
     events: [],
+    currentRole: null,
+    currentConsumerUserId: null,
+    currentRecruiterProfileId: null,
+    currentOrganizationId: null,
+    currentOrganizationRole: null,
+    currentOrganization: null,
+    organizations: [],
+    needsActorSelection: false,
+    needsOrganizationSetup: false,
+    mutationError: null,
   };
 }
 
@@ -72,9 +125,14 @@ function getSnapshot() {
 }
 
 function updateState(nextState: MockStoreState) {
+  const shouldRecomputeArtists =
+    nextState.events !== storeState.events || nextState.artists !== storeState.artists;
+
   storeState = {
     ...nextState,
-    artists: deriveArtists(nextState.events, nextState.artists),
+    artists: shouldRecomputeArtists
+      ? deriveArtists(nextState.events, nextState.artists)
+      : storeState.artists,
   };
   emitChange();
 }
@@ -89,11 +147,22 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
     cache: "no-store",
   });
 
+  const body = await response.json().catch(() => null);
+
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    if (isApiErrorPayload(body)) {
+      throw new ClientApiError(
+        body.error.message,
+        body.error.status,
+        body.error.code,
+        body.error.details,
+      );
+    }
+
+    throw new ClientApiError(`Request failed: ${response.status}`, response.status, "REQUEST_FAILED");
   }
 
-  return response.json() as Promise<T>;
+  return body as T;
 }
 
 async function bootstrapFromDb() {
@@ -103,6 +172,96 @@ async function bootstrapFromDb() {
     artists: remoteState.artists?.length
       ? remoteState.artists
       : deriveArtists(remoteState.events),
+    mutationError: null,
+  });
+}
+
+function setMutationError(error: unknown, fallbackMessage?: string) {
+  const nextError = toStoreMutationError(error);
+
+  updateState({
+    ...storeState,
+    mutationError: fallbackMessage
+      ? {
+          ...nextError,
+          message: fallbackMessage,
+        }
+      : nextError,
+  });
+}
+
+async function revalidateFromDb(previousState?: MockStoreState) {
+  try {
+    await bootstrapFromDb();
+  } catch (error) {
+    if (previousState) {
+      updateState({
+        ...previousState,
+        mutationError: toStoreMutationError(error),
+      });
+      return;
+    }
+
+    setMutationError(error, "We could not refresh the latest data from the backend.");
+  }
+}
+
+function toStoreMutationError(error: unknown): StoreMutationError {
+  if (error instanceof ClientApiError) {
+    return {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    };
+  }
+
+  return {
+    message: "Something went wrong while saving your changes.",
+    code: "REQUEST_FAILED",
+    status: 500,
+  };
+}
+
+async function runBackendMutation<T>({
+  optimisticState,
+  request,
+  reconcile,
+}: {
+  optimisticState?: (state: MockStoreState) => MockStoreState;
+  request: () => Promise<T>;
+  reconcile: (state: MockStoreState, result: T) => MockStoreState;
+}) {
+  const previousState = storeState;
+
+  if (optimisticState) {
+    updateState(optimisticState(previousState));
+  }
+
+  try {
+    const result = await request();
+    updateState({
+      ...reconcile(storeState, result),
+      mutationError: null,
+    });
+    return result;
+  } catch (error) {
+    await revalidateFromDb(previousState);
+    updateState({
+      ...storeState,
+      mutationError: toStoreMutationError(error),
+    });
+    throw error;
+  }
+}
+
+function clearMutationError() {
+  if (!storeState.mutationError) {
+    return;
+  }
+
+  updateState({
+    ...storeState,
+    mutationError: null,
   });
 }
 
@@ -139,7 +298,64 @@ function getUserById(id: string) {
 }
 
 function getCurrentConsumerUser() {
-  return storeState.users[0] ?? null;
+  if (!storeState.currentConsumerUserId) {
+    return null;
+  }
+
+  return getUserById(storeState.currentConsumerUserId) ?? null;
+}
+
+async function updateProfile(update: Partial<RecruiterProfile>) {
+  const nextProfile: RecruiterProfile = {
+    ...storeState.profile,
+    ...update,
+    media: update.media ? { ...storeState.profile.media, ...update.media } : storeState.profile.media,
+    location: update.location ? { ...storeState.profile.location, ...update.location } : storeState.profile.location,
+    links: update.links ? { ...storeState.profile.links, ...update.links } : storeState.profile.links,
+    soundProfile: update.soundProfile
+      ? { ...storeState.profile.soundProfile, ...update.soundProfile }
+      : storeState.profile.soundProfile,
+    stats: update.stats ? { ...storeState.profile.stats, ...update.stats } : storeState.profile.stats,
+  };
+
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      profile: nextProfile,
+    }),
+    request: () =>
+      fetchJson<RecruiterProfile>("/api/store/profile", {
+        method: "PUT",
+        body: JSON.stringify(nextProfile),
+      }),
+    reconcile: (state, savedProfile) => ({
+      ...state,
+      profile: savedProfile,
+    }),
+  }).catch(() => null);
+}
+
+async function switchOrganization(organizationId: string) {
+  const previousState = storeState;
+
+  try {
+    await fetchJson<{ organization: WorkspaceOrganization; role: "owner" | "member" }>(
+      "/api/workspace/organizations/current/switch",
+      {
+        method: "POST",
+        body: JSON.stringify({ organizationId }),
+      },
+    );
+    await bootstrapFromDb();
+    return true;
+  } catch (error) {
+    await revalidateFromDb(previousState);
+    updateState({
+      ...storeState,
+      mutationError: toStoreMutationError(error),
+    });
+    return false;
+  }
 }
 
 function getArtistById(id: string) {
@@ -153,28 +369,21 @@ function upsertArtists(nextArtists: ArtistProfile[]) {
   });
 }
 
-function createDraftEvent(overrides?: Partial<Event>) {
-  const draft = createDraftEventSeed(overrides);
+async function createDraftEvent(overrides?: Partial<Event>) {
+  const savedEvent = await fetchJson<Event>("/api/store/events", {
+    method: "POST",
+    body: JSON.stringify(overrides ?? {}),
+  });
 
   updateState({
     ...storeState,
-    events: [draft, ...storeState.events],
+    events: [savedEvent, ...storeState.events.filter((event) => event.id !== savedEvent.id)],
   });
 
-  void fetchJson<Event>("/api/store/events", {
-    method: "POST",
-    body: JSON.stringify(draft),
-  }).then((savedEvent) => {
-    updateState({
-      ...storeState,
-      events: storeState.events.map((event) => (event.id === savedEvent.id ? savedEvent : event)),
-    });
-  }).catch(() => {});
-
-  return draft;
+  return savedEvent;
 }
 
-function updateEvent(update: EventUpdate) {
+async function updateEvent(update: EventUpdate) {
   const existingEvent = getEventById(update.id);
   if (!existingEvent) {
     return null;
@@ -182,44 +391,134 @@ function updateEvent(update: EventUpdate) {
 
   const nextEvent = mergeEvent(existingEvent, {
     ...update,
+      updatedAt: new Date().toISOString(),
+  });
+
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((event) => (event.id === update.id ? nextEvent : event)),
+    }),
+    request: () =>
+      fetchJson<Event>(`/api/store/events/${update.id}`, {
+        method: "PUT",
+        body: JSON.stringify(nextEvent),
+      }),
+    reconcile: (state, savedEvent) => ({
+      ...state,
+      events: state.events.map((event) => (event.id === savedEvent.id ? savedEvent : event)),
+    }),
+  }).catch(() => null);
+}
+
+async function saveEventEditorSections(update: EventEditorSectionUpdate) {
+  const existingEvent = getEventById(update.id);
+  if (!existingEvent) {
+    return null;
+  }
+
+  const nextEvent: Event = {
+    ...existingEvent,
+    slug: update.slug,
+    admissionMode: update.admissionMode,
+    cover: update.cover,
+    lineup: update.lineup,
+    timetable: update.timetable,
+    guestlist: update.guestlist,
+    budget: update.budget,
+    tickets: update.tickets,
     updatedAt: new Date().toISOString(),
-  });
+  };
 
-  updateState({
-    ...storeState,
-    events: storeState.events.map((event) => (event.id === update.id ? nextEvent : event)),
-  });
-
-  void fetchJson<Event>(`/api/store/events/${update.id}`, {
-    method: "PUT",
-    body: JSON.stringify(nextEvent),
-  }).then((savedEvent) => {
-    updateState({
-      ...storeState,
-      events: storeState.events.map((event) => (event.id === savedEvent.id ? savedEvent : event)),
-    });
-  }).catch(() => {});
-
-  return nextEvent;
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((event) => (event.id === update.id ? nextEvent : event)),
+    }),
+    request: async () => {
+      await fetchJson<Event>(`/api/store/events/${update.id}/cover`, {
+        method: "PUT",
+        body: JSON.stringify({
+          slug: update.slug,
+          admissionMode: update.admissionMode,
+          cover: update.cover,
+        }),
+      });
+      await fetchJson<Event>(`/api/store/events/${update.id}/lineup`, {
+        method: "PUT",
+        body: JSON.stringify({ lineup: update.lineup }),
+      });
+      await fetchJson<Event>(`/api/store/events/${update.id}/timetable`, {
+        method: "PUT",
+        body: JSON.stringify({ timetable: update.timetable }),
+      });
+      await fetchJson<Event>(`/api/store/events/${update.id}/guestlist`, {
+        method: "PUT",
+        body: JSON.stringify({ guestlist: update.guestlist }),
+      });
+      await fetchJson<Event>(`/api/store/events/${update.id}/budget`, {
+        method: "PUT",
+        body: JSON.stringify({ budget: update.budget }),
+      });
+      return fetchJson<Event>(`/api/store/events/${update.id}/tickets`, {
+        method: "PUT",
+        body: JSON.stringify({ tickets: update.tickets }),
+      });
+    },
+    reconcile: (state, savedEvent) => ({
+      ...state,
+      events: state.events.map((event) => (event.id === savedEvent.id ? savedEvent : event)),
+    }),
+  }).catch(() => null);
 }
 
-function updateEventStatus(id: string, status: EventStatus) {
-  return updateEvent({ id, status });
+async function updateEventStatus(id: string, status: EventStatus) {
+  const event = getEventById(id);
+  if (!event) {
+    return null;
+  }
+
+  const nextEvent = {
+    ...event,
+    status,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === id ? nextEvent : candidate)),
+    }),
+    request: () =>
+      fetchJson<Event>(`/api/store/events/${id}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      }),
+    reconcile: (state, savedEvent) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    }),
+  }).catch(() => null);
 }
 
-function deleteEvent(id: string) {
-  updateState({
-    ...storeState,
-    events: storeState.events.filter((event) => event.id !== id),
-  });
-
-  void fetch(`/api/store/events/${id}`, {
-    method: "DELETE",
-    cache: "no-store",
-  }).catch(() => {});
+async function deleteEvent(id: string) {
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.filter((event) => event.id !== id),
+    }),
+    request: () =>
+      fetchJson<null>(`/api/store/events/${id}`, {
+        method: "DELETE",
+      }),
+    reconcile: (state) => ({
+      ...state,
+      events: state.events.filter((event) => event.id !== id),
+    }),
+  }).then(() => true).catch(() => false);
 }
 
-function updateUser(update: UserUpdate) {
+async function updateUser(update: UserUpdate) {
   const existingUser = getUserById(update.id);
   if (!existingUser) {
     return null;
@@ -232,25 +531,24 @@ function updateUser(update: UserUpdate) {
       typeof update.username === "string" ? update.username.toLowerCase() : existingUser.username,
   };
 
-  updateState({
-    ...storeState,
-    users: storeState.users.map((user) => (user.id === update.id ? nextUser : user)),
-  });
-
-  void fetchJson<ConsumerUser>(`/api/store/users/${update.id}`, {
-    method: "PUT",
-    body: JSON.stringify(nextUser),
-  }).then((savedUser) => {
-    updateState({
-      ...storeState,
-      users: storeState.users.map((user) => (user.id === savedUser.id ? savedUser : user)),
-    });
-  }).catch(() => {});
-
-  return nextUser;
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      users: state.users.map((user) => (user.id === update.id ? nextUser : user)),
+    }),
+    request: () =>
+      fetchJson<ConsumerUser>(`/api/store/users/${update.id}`, {
+        method: "PUT",
+        body: JSON.stringify(nextUser),
+      }),
+    reconcile: (state, savedUser) => ({
+      ...state,
+      users: state.users.map((user) => (user.id === savedUser.id ? savedUser : user)),
+    }),
+  }).catch(() => null);
 }
 
-function purchaseTicketSection({
+async function purchaseTicketSection({
   eventId,
   userId,
   sectionId,
@@ -273,11 +571,57 @@ function purchaseTicketSection({
     return null;
   }
 
+  const phase = section.phases
+    .filter((candidate) => candidate.visibility === "public" && candidate.status !== "sold_out")
+    .sort((left, right) => left.sortOrder - right.sortOrder)[0];
+
+  if (!phase) {
+    return null;
+  }
+
+  if (phase.price > 0) {
+    const result = await runBackendMutation({
+      request: () =>
+        fetchJson<TicketCheckoutIntentResult | TicketOrderPaymentTransitionResult>(
+          `/api/store/events/${eventId}/purchase`,
+          {
+            method: "POST",
+            body: JSON.stringify({ userId, sectionId, quantity }),
+          },
+        ),
+      reconcile: (state, result) => {
+        if (!result.fulfilled || !result.event || !result.user) {
+          return state;
+        }
+
+        return {
+          ...state,
+          events: state.events.map((candidate) => (candidate.id === result.event!.id ? result.event! : candidate)),
+          users: state.users.map((candidate) => (candidate.id === result.user!.id ? result.user! : candidate)),
+        };
+      },
+    }).catch(() => null);
+
+    if (
+      result &&
+      !result.fulfilled &&
+      "checkout" in result &&
+      result.checkout.stripeCheckoutUrl &&
+      typeof window !== "undefined"
+    ) {
+      window.location.assign(result.checkout.stripeCheckoutUrl);
+    }
+
+    return result;
+  }
+
   const purchasedAt = new Date().toISOString();
   const nextEvent = syncTicketPurchaseToEvent(event, {
     userId,
     accessGroupId: section.accessGroupId,
+    ticketPhaseId: phase.id,
     purchasedAt,
+    quantity,
   });
   const nextUser = syncTicketPurchaseToUser(user, {
     eventSlug: event.slug,
@@ -287,27 +631,32 @@ function purchaseTicketSection({
     status: "active",
   });
 
-  updateState({
-    ...storeState,
-    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
-    users: storeState.users.map((candidate) => (candidate.id === userId ? nextUser : candidate)),
-  });
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
+      users: state.users.map((candidate) => (candidate.id === userId ? nextUser : candidate)),
+    }),
+    request: () =>
+      fetchJson<TicketCheckoutIntentResult | TicketOrderPaymentTransitionResult>(`/api/store/events/${eventId}/purchase`, {
+        method: "POST",
+        body: JSON.stringify({ userId, sectionId, quantity }),
+      }),
+    reconcile: (state, result) => {
+      if (!result.fulfilled || !result.event || !result.user) {
+        return state;
+      }
 
-  void fetchJson<{ event: Event; user: ConsumerUser }>(`/api/store/events/${eventId}/purchase`, {
-    method: "POST",
-    body: JSON.stringify({ userId, sectionId, quantity }),
-  }).then(({ event: savedEvent, user: savedUser }) => {
-    updateState({
-      ...storeState,
-      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
-      users: storeState.users.map((candidate) => (candidate.id === savedUser.id ? savedUser : candidate)),
-    });
-  }).catch(() => {});
-
-  return nextEvent;
+      return {
+        ...state,
+        events: state.events.map((candidate) => (candidate.id === result.event!.id ? result.event! : candidate)),
+        users: state.users.map((candidate) => (candidate.id === result.user!.id ? result.user! : candidate)),
+      };
+    },
+  }).catch(() => null);
 }
 
-function applyToCuratedEvent({
+async function applyToCuratedEvent({
   eventId,
   userId,
 }: {
@@ -320,25 +669,25 @@ function applyToCuratedEvent({
   }
 
   const nextEvent = applyToCuratedEventRecord(event, userId);
-  updateState({
-    ...storeState,
-    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
-  });
 
-  void fetchJson<Event>(`/api/store/events/${eventId}/applications/apply`, {
-    method: "POST",
-    body: JSON.stringify({ userId }),
-  }).then((savedEvent) => {
-    updateState({
-      ...storeState,
-      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
-    });
-  }).catch(() => {});
-
-  return nextEvent;
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
+    }),
+    request: () =>
+      fetchJson<Event>(`/api/store/events/${eventId}/applications/apply`, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      }),
+    reconcile: (state, savedEvent) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    }),
+  }).catch(() => null);
 }
 
-function approveCuratedApplication({
+async function approveCuratedApplication({
   eventId,
   userId,
   accessGroupId,
@@ -357,25 +706,24 @@ function approveCuratedApplication({
     accessGroupId,
   });
 
-  updateState({
-    ...storeState,
-    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
-  });
-
-  void fetchJson<Event>(`/api/store/events/${eventId}/applications/${userId}/approve`, {
-    method: "POST",
-    body: JSON.stringify({ accessGroupId }),
-  }).then((savedEvent) => {
-    updateState({
-      ...storeState,
-      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
-    });
-  }).catch(() => {});
-
-  return nextEvent;
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
+    }),
+    request: () =>
+      fetchJson<Event>(`/api/store/events/${eventId}/applications/${userId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ accessGroupId }),
+      }),
+    reconcile: (state, savedEvent) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    }),
+  }).catch(() => null);
 }
 
-function denyCuratedApplication({
+async function denyCuratedApplication({
   eventId,
   userId,
 }: {
@@ -391,21 +739,20 @@ function denyCuratedApplication({
     userId,
   });
 
-  updateState({
-    ...storeState,
-    events: storeState.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
-  });
-
-  void fetchJson<Event>(`/api/store/events/${eventId}/applications/${userId}/deny`, {
-    method: "POST",
-  }).then((savedEvent) => {
-    updateState({
-      ...storeState,
-      events: storeState.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
-    });
-  }).catch(() => {});
-
-  return nextEvent;
+  return runBackendMutation({
+    optimisticState: (state) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === eventId ? nextEvent : candidate)),
+    }),
+    request: () =>
+      fetchJson<Event>(`/api/store/events/${eventId}/applications/${userId}/deny`, {
+        method: "POST",
+      }),
+    reconcile: (state, savedEvent) => ({
+      ...state,
+      events: state.events.map((candidate) => (candidate.id === savedEvent.id ? savedEvent : candidate)),
+    }),
+  }).catch(() => null);
 }
 
 function resetMockData() {
@@ -413,8 +760,9 @@ function resetMockData() {
   hasBootstrapped = false;
   void bootstrapFromDb().then(() => {
     hasBootstrapped = true;
-  }).catch(() => {
+  }).catch((error) => {
     hasBootstrapped = false;
+    setMutationError(error, "We could not reload the latest data from the backend.");
   });
 }
 
@@ -427,8 +775,9 @@ export function useMockEventsStore() {
     }
 
     hasBootstrapped = true;
-    void bootstrapFromDb().catch(() => {
+    void bootstrapFromDb().catch((error) => {
       hasBootstrapped = false;
+      setMutationError(error, "We could not load the latest data from the backend.");
     });
   }, []);
 
@@ -439,9 +788,12 @@ export function useMockEventsStore() {
     getEventsByStatus,
     getUserById,
     getCurrentConsumerUser,
+    updateProfile,
+    switchOrganization,
     getArtistById,
     createDraftEvent,
     updateEvent,
+    saveEventEditorSections,
     updateEventStatus,
     deleteEvent,
     updateUser,
@@ -451,5 +803,6 @@ export function useMockEventsStore() {
     denyCuratedApplication,
     upsertArtists,
     resetMockData,
+    clearMutationError,
   };
 }

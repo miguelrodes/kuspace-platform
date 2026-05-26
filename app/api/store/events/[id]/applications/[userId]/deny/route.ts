@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { denyCuratedApplication } from "@/lib/event-access";
-import { getEventById, saveEventAggregate } from "@/lib/db/store-repository";
+import { parseOptionalJsonBody, parseRouteParams, withRouteHandler } from "@/lib/http/route";
+import { denyCuratedApplicationService } from "@/lib/services/application-service";
+import { denyCuratedApplicationSchema, idAndUserIdParamsSchema } from "@/lib/validation/store";
 
 type RouteContext = {
   params: Promise<{
@@ -9,15 +9,10 @@ type RouteContext = {
   }>;
 };
 
-export async function POST(_: Request, context: RouteContext) {
-  const { id, userId } = await context.params;
-  const event = await getEventById(id);
-
-  if (!event) {
-    return NextResponse.json(null, { status: 404 });
-  }
-
-  const nextEvent = denyCuratedApplication(event, { userId });
-  const savedEvent = await saveEventAggregate(nextEvent);
-  return NextResponse.json(savedEvent);
+export async function POST(request: Request, context: RouteContext) {
+  return withRouteHandler(async () => {
+    const { id, userId } = await parseRouteParams(context.params, idAndUserIdParamsSchema);
+    await parseOptionalJsonBody(request, denyCuratedApplicationSchema);
+    return denyCuratedApplicationService({ eventId: id, userId });
+  });
 }

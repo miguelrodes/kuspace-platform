@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import type { ConsumerUser } from "@/types/user";
-import { saveConsumerUser } from "@/lib/db/store-repository";
+import { parseJsonBody, parseRouteParams, withRouteHandler } from "@/lib/http/route";
+import { updateConsumerUserService } from "@/lib/services/consumer-service";
+import { consumerProfileUpdateSchema, idParamsSchema } from "@/lib/validation/store";
 
 type RouteContext = {
   params: Promise<{
@@ -9,8 +9,9 @@ type RouteContext = {
 };
 
 export async function PUT(request: Request, context: RouteContext) {
-  const { id } = await context.params;
-  const user = (await request.json()) as ConsumerUser;
-  const savedUser = await saveConsumerUser({ ...user, id });
-  return NextResponse.json(savedUser);
+  return withRouteHandler(async () => {
+    const { id } = await parseRouteParams(context.params, idParamsSchema);
+    const user = await parseJsonBody(request, consumerProfileUpdateSchema);
+    return updateConsumerUserService(id, user);
+  });
 }

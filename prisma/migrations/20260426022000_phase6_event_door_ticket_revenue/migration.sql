@@ -1,0 +1,2 @@
+ALTER TABLE "events"
+ADD COLUMN "doorTicketRevenue" DECIMAL(12,2) NOT NULL DEFAULT 0;

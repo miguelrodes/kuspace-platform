@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
-import type { Event } from "@/types/event";
-import { deleteEventAggregate, saveEventAggregate } from "@/lib/db/store-repository";
+import { parseJsonBody, parseRouteParams, withRouteHandler } from "@/lib/http/route";
+import { getOwnedEventEditorAggregateService } from "@/lib/services/event-editor-service";
+import { deleteEventService, updateEventService } from "@/lib/services/event-service";
+import { eventUpdateSchema, idParamsSchema } from "@/lib/validation/store";
 
 type RouteContext = {
   params: Promise<{
@@ -9,14 +10,23 @@ type RouteContext = {
 };
 
 export async function PUT(request: Request, context: RouteContext) {
-  const { id } = await context.params;
-  const event = (await request.json()) as Event;
-  const savedEvent = await saveEventAggregate({ ...event, id });
-  return NextResponse.json(savedEvent);
+  return withRouteHandler(async () => {
+    const { id } = await parseRouteParams(context.params, idParamsSchema);
+    const event = await parseJsonBody(request, eventUpdateSchema);
+    return updateEventService(id, event);
+  });
+}
+
+export async function GET(_: Request, context: RouteContext) {
+  return withRouteHandler(async () => {
+    const { id } = await parseRouteParams(context.params, idParamsSchema);
+    return getOwnedEventEditorAggregateService(id);
+  });
 }
 
 export async function DELETE(_: Request, context: RouteContext) {
-  const { id } = await context.params;
-  await deleteEventAggregate(id);
-  return NextResponse.json({ ok: true });
+  return withRouteHandler(async () => {
+    const { id } = await parseRouteParams(context.params, idParamsSchema);
+    return deleteEventService(id);
+  });
 }

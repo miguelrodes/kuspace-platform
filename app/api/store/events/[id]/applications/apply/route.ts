@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { getEventById, saveEventAggregate } from "@/lib/db/store-repository";
-import { applyToCuratedEvent } from "@/lib/event-access";
+import { parseJsonBody, parseRouteParams, withRouteHandler } from "@/lib/http/route";
+import { applyToCuratedEventService } from "@/lib/services/application-service";
+import { applyToCuratedEventSchema, idParamsSchema } from "@/lib/validation/store";
 
 type RouteContext = {
   params: Promise<{
@@ -9,15 +9,9 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
-  const { id } = await context.params;
-  const { userId } = (await request.json()) as { userId: string };
-  const event = await getEventById(id);
-
-  if (!event) {
-    return NextResponse.json(null, { status: 404 });
-  }
-
-  const nextEvent = applyToCuratedEvent(event, userId);
-  const savedEvent = await saveEventAggregate(nextEvent);
-  return NextResponse.json(savedEvent);
+  return withRouteHandler(async () => {
+    const { id } = await parseRouteParams(context.params, idParamsSchema);
+    const body = await parseJsonBody(request, applyToCuratedEventSchema);
+    return applyToCuratedEventService({ eventId: id, userId: body.userId });
+  }, { successStatus: 201 });
 }

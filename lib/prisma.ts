@@ -5,10 +5,35 @@ declare global {
   var __prisma__: PrismaClient | undefined;
 }
 
-const prismaDatasourceUrl =
+function normalizePrismaRuntimeUrl(rawUrl: string | undefined) {
+  if (!rawUrl) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+
+    if (url.hostname.includes(".pooler.supabase.com")) {
+      if (!url.searchParams.has("pgbouncer")) {
+        url.searchParams.set("pgbouncer", "true");
+      }
+
+      if (!url.searchParams.has("connection_limit")) {
+        url.searchParams.set("connection_limit", "1");
+      }
+    }
+
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+const prismaDatasourceUrl = normalizePrismaRuntimeUrl(
   process.env.NODE_ENV === "production"
     ? process.env.DATABASE_URL
-    : process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+    : process.env.DATABASE_URL ?? process.env.DIRECT_URL,
+);
 
 export const prisma =
   global.__prisma__ ??

@@ -60,6 +60,8 @@ export type RecruiterProfileMedia = {
 
 export interface RecruiterProfile {
   id: string;
+  clerkUserId?: string;
+  organizationId?: string;
   slug: string;
   recruiterType: RecruiterType;
 

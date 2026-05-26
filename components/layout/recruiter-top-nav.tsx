@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { GlobalSearchOverlay } from "@/components/layout/global-search-overlay";
+import { MutationErrorBanner } from "@/components/ui/mutation-error-banner";
 import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
@@ -20,46 +21,96 @@ export function RecruiterTopNav({
 }: RecruiterTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { events, profile } = useMockEventsStore();
+  const {
+    events,
+    profile,
+    currentOrganization,
+    currentOrganizationId,
+    organizations = [],
+    mutationError,
+    clearMutationError,
+    switchOrganization,
+  } = useMockEventsStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(currentOrganizationId ?? "");
 
-  const navItems = [
-    {
-      href: "/rechome",
-      label: "Home",
-      active: pathname === "/rechome",
-    },
-    {
-      href: "/office",
-      label: "Office",
-      active: pathname.startsWith("/office"),
-    },
-    {
-      href: "/recprofile/neon-harbor",
-      label: "Profile",
-      active: pathname.startsWith("/recprofile"),
-    },
-  ];
+  useEffect(() => {
+    setSelectedOrganizationId(currentOrganizationId ?? "");
+  }, [currentOrganizationId]);
+
+  const navItems = useMemo(
+    () => [
+      {
+        href: "/rechome",
+        label: "Home",
+        active: pathname === "/rechome",
+      },
+      {
+        href: "/office",
+        label: "Office",
+        active: pathname.startsWith("/office"),
+      },
+      {
+        href: profile.slug ? `/recprofile/${profile.slug}` : "/recprofile",
+        label: "Profile",
+        active: pathname.startsWith("/recprofile"),
+      },
+    ],
+    [pathname, profile.slug],
+  );
 
   const handleNavigate = (href: string) => {
     setIsSearchOpen(false);
     router.push(href);
   };
 
-  const labels = Array.from(
-    new Map(
-      events
-        .flatMap((event) => resolveEventLabels(event, profile))
-        .map((label) => [
-          label.id,
-          {
-            id: label.id,
-            name: label.name,
-            avatarImageUrl: label.avatarImageUrl,
-            href: label.profileSlug ? `/recprofile/${label.profileSlug}` : undefined,
-          },
-        ]),
-    ).values(),
+  const handleWorkspaceChange = async (organizationId: string) => {
+    setSelectedOrganizationId(organizationId);
+    setIsSwitchingWorkspace(true);
+    const switched = await switchOrganization(organizationId);
+    setIsSwitchingWorkspace(false);
+
+    if (!switched) {
+      setSelectedOrganizationId(currentOrganizationId ?? "");
+      return;
+    }
+
+    startTransition(() => {
+      router.refresh();
+    });
+  };
+
+  const publicEvents = useMemo(() => getPublicEventCollection(events), [events]);
+  const labels = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          events
+            .flatMap((event) => resolveEventLabels(event, profile))
+            .map((label) => [
+              label.id,
+              {
+                id: label.id,
+                name: label.name,
+                avatarImageUrl: label.avatarImageUrl,
+                href: label.profileSlug ? `/recprofile/${label.profileSlug}` : undefined,
+              },
+            ]),
+        ).values(),
+      ),
+    [events, profile],
+  );
+  const nightclubs = useMemo(
+    () => [
+      {
+        id: profile.id,
+        name: profile.displayName,
+        slug: profile.slug,
+        avatarImageUrl: profile.media?.avatarImageUrl,
+      },
+    ],
+    [profile.displayName, profile.id, profile.media?.avatarImageUrl, profile.slug],
   );
 
   return (
@@ -69,13 +120,45 @@ export function RecruiterTopNav({
           <Link href="/rechome" aria-label="Go to home">
             <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
           </Link>
-          <Link href="/rechome" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
-            <img
-              src="/title-logo.svg"
-              alt="KUSPACE"
-              className="block h-10 w-auto translate-y-[3px]"
-            />
-          </Link>
+          <div className="flex min-w-0 items-end gap-3">
+            <Link href="/rechome" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
+              <img
+                src="/title-logo.svg"
+                alt="KUSPACE"
+                className="block h-10 w-auto translate-y-[3px]"
+              />
+            </Link>
+            {currentOrganization ? (
+              <div className="min-w-0 space-y-0.5 pb-0.5">
+                <p className="truncate text-body-sm uppercase tracking-[0.12em] text-muted">
+                  Workspace
+                </p>
+                {organizations.length > 1 ? (
+                  <select
+                    value={selectedOrganizationId}
+                    onChange={(event) => void handleWorkspaceChange(event.target.value)}
+                    disabled={isSwitchingWorkspace}
+                    className="max-w-[14rem] border-0 bg-transparent p-0 text-body text-fg outline-none"
+                    aria-label="Switch workspace"
+                  >
+                    {organizations.map((membership) => (
+                      <option
+                        key={membership.organization.id}
+                        value={membership.organization.id}
+                        className="bg-panel text-fg"
+                      >
+                        {membership.organization.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="truncate text-body text-fg">
+                    {currentOrganization.name}
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-0">
@@ -124,20 +207,19 @@ export function RecruiterTopNav({
       <GlobalSearchOverlay
         open={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        events={getPublicEventCollection(events)}
-        nightclubs={[
-          {
-            id: profile.id,
-            name: profile.displayName,
-            slug: profile.slug,
-            avatarImageUrl: profile.media?.avatarImageUrl,
-          },
-        ]}
+        events={publicEvents}
+        nightclubs={nightclubs}
         labels={labels}
         eventHrefFor={(event) => `/rec/events/${event.slug}`}
         nightclubHrefFor={(nightclub) => `/recprofile/${nightclub.slug}`}
         onNavigate={handleNavigate}
       />
+      {mutationError ? (
+        <MutationErrorBanner
+          message={mutationError.message}
+          onDismiss={clearMutationError}
+        />
+      ) : null}
     </header>
   );
 }

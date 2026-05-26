@@ -1,12 +1,6 @@
-import { NextResponse } from "next/server";
-import { getBootstrapState } from "@/lib/db/store-repository";
+import { withRouteHandler } from "@/lib/http/route";
+import { getStoreBootstrapService } from "@/lib/services/bootstrap-service";
 
 export async function GET() {
-  try {
-    const state = await getBootstrapState();
-    return NextResponse.json(state);
-  } catch (error) {
-    console.error("Failed to load DB bootstrap state", error);
-    return NextResponse.json({ error: "Failed to load store bootstrap state" }, { status: 500 });
-  }
+  return withRouteHandler(async () => getStoreBootstrapService());
 }

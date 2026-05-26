@@ -30,7 +30,7 @@ function getInitialVisibleMonth(events: Event[]) {
 function buildCalendarDays(
   month: number,
   year: number,
-  events: Event[],
+  eventsByDate: Map<string, Event[]>,
 ): OfficeCalendarDay[] {
   const firstDay = new Date(year, month, 1, 12, 0, 0);
   const start = new Date(firstDay);
@@ -49,9 +49,7 @@ function buildCalendarDays(
       date: isoDate,
       dayNumber: current.getDate(),
       isCurrentMonth: current.getMonth() === month,
-      events: events
-        .filter((event) => event.cover.date === isoDate)
-        .sort((left, right) => left.cover.date.localeCompare(right.cover.date)),
+      events: eventsByDate.get(isoDate) ?? [],
     };
   });
 }
@@ -70,10 +68,30 @@ export function OfficeCalendar({ events, closeSignal }: OfficeCalendarProps) {
     years.add(visibleYear);
     return Array.from(years).sort((left, right) => left - right);
   }, [events, visibleYear]);
+  const eventsByDate = useMemo(() => {
+    const grouped = new Map<string, Event[]>();
+
+    events.forEach((event) => {
+      const existing = grouped.get(event.cover.date);
+
+      if (existing) {
+        existing.push(event);
+        return;
+      }
+
+      grouped.set(event.cover.date, [event]);
+    });
+
+    grouped.forEach((groupedEvents) => {
+      groupedEvents.sort((left, right) => left.cover.date.localeCompare(right.cover.date));
+    });
+
+    return grouped;
+  }, [events]);
 
   const days = useMemo(
-    () => buildCalendarDays(visibleMonth, visibleYear, events),
-    [events, visibleMonth, visibleYear],
+    () => buildCalendarDays(visibleMonth, visibleYear, eventsByDate),
+    [eventsByDate, visibleMonth, visibleYear],
   );
 
   return (

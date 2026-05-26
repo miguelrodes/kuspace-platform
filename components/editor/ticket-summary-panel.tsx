@@ -16,6 +16,17 @@ type ChartPoint = {
   value: number;
 };
 
+type NormalizedPhaseMetrics = {
+  sectionId: string;
+  phaseName: string;
+  quantityAvailable: number;
+  quantitySold: number;
+  price: number;
+  status: TicketSectionDraft["phases"][number]["status"];
+  salesStart?: string;
+  salesEnd?: string;
+};
+
 const PROTOTYPE_NOW = new Date("2016-09-15T09:00:00.000Z");
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -284,37 +295,60 @@ function SummaryChart({
 export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
   const [ticketsWindow, setTicketsWindow] = useState<TimeWindow>("full");
   const [velocityWindow, setVelocityWindow] = useState<TimeWindow>("full");
+  const normalizedPhases = useMemo<NormalizedPhaseMetrics[]>(
+    () =>
+      sections.flatMap((section) =>
+        section.phases.map((phase) => ({
+          sectionId: section.id,
+          phaseName: phase.name,
+          quantityAvailable: parseNumber(phase.quantityAvailable),
+          quantitySold: parseNumber(phase.quantitySold),
+          price: parseNumber(phase.price),
+          status: phase.status,
+          salesStart: phase.salesStart || undefined,
+          salesEnd: phase.salesEnd || undefined,
+        })),
+      ),
+    [sections],
+  );
+  const phasesBySection = useMemo(() => {
+    const grouped = new Map<string, NormalizedPhaseMetrics[]>();
+
+    normalizedPhases.forEach((phase) => {
+      const existing = grouped.get(phase.sectionId);
+
+      if (existing) {
+        existing.push(phase);
+        return;
+      }
+
+      grouped.set(phase.sectionId, [phase]);
+    });
+
+    return grouped;
+  }, [normalizedPhases]);
   const anchorTimestamp = useMemo(() => getAnchorTimestamp(sections), [sections]);
 
   const metrics = useMemo(() => {
-    const totalCapacity = sections.reduce(
-      (sum, section) =>
-        sum + section.phases.reduce((inner, phase) => inner + parseNumber(phase.quantityAvailable), 0),
+    const totalCapacity = normalizedPhases.reduce(
+      (sum, phase) => sum + phase.quantityAvailable,
       0,
     );
-    const soldCapacity = sections.reduce(
-      (sum, section) =>
-        sum + section.phases.reduce((inner, phase) => inner + parseNumber(phase.quantitySold), 0),
+    const soldCapacity = normalizedPhases.reduce(
+      (sum, phase) => sum + phase.quantitySold,
       0,
     );
-    const totalRevenue = sections.reduce(
-      (sum, section) =>
-        sum +
-        section.phases.reduce(
-          (inner, phase) => inner + parseNumber(phase.price) * parseNumber(phase.quantitySold),
-          0,
-        ),
+    const totalRevenue = normalizedPhases.reduce(
+      (sum, phase) => sum + phase.price * phase.quantitySold,
       0,
     );
 
-    const velocityValues = sections.flatMap((section) =>
-      section.phases.map((phase) =>
+    const velocityValues = normalizedPhases.map((phase) =>
         computeTicketsPerHour(
-          parseNumber(phase.quantitySold),
+          phase.quantitySold,
           phase.salesStart,
           phase.salesEnd,
         ),
-      ),
     );
     const nonZeroVelocities = velocityValues.filter((value) => value > 0);
     const averageVelocity = nonZeroVelocities.length
@@ -325,19 +359,12 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         )
       : 0;
 
-    const weightedPriceBase = sections.reduce(
-      (sum, section) =>
-        sum +
-        section.phases.reduce((inner, phase) => inner + parseNumber(phase.quantityAvailable), 0),
+    const weightedPriceBase = normalizedPhases.reduce(
+      (sum, phase) => sum + phase.quantityAvailable,
       0,
     );
-    const weightedPriceTotal = sections.reduce(
-      (sum, section) =>
-        sum +
-        section.phases.reduce(
-          (inner, phase) => inner + parseNumber(phase.price) * parseNumber(phase.quantityAvailable),
-          0,
-        ),
+    const weightedPriceTotal = normalizedPhases.reduce(
+      (sum, phase) => sum + phase.price * phase.quantityAvailable,
       0,
     );
     const averageTicketPrice = weightedPriceBase > 0 ? weightedPriceTotal / weightedPriceBase : 0;
@@ -349,23 +376,27 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
       averageVelocity,
       averageTicketPrice,
     };
-  }, [sections]);
+  }, [normalizedPhases]);
 
   const sectionPerformance = useMemo(() => {
     return sections.map((section) => {
-      const capacity = section.phases.reduce(
-        (sum, phase) => sum + parseNumber(phase.quantityAvailable),
+      const sectionPhases = phasesBySection.get(section.id) ?? [];
+      const capacity = sectionPhases.reduce(
+        (sum, phase) => sum + phase.quantityAvailable,
         0,
       );
-      const sold = section.phases.reduce((sum, phase) => sum + parseNumber(phase.quantitySold), 0);
-      const revenue = section.phases.reduce(
-        (sum, phase) => sum + parseNumber(phase.price) * parseNumber(phase.quantitySold),
+      const sold = sectionPhases.reduce(
+        (sum, phase) => sum + phase.quantitySold,
         0,
       );
-      const velocityValues = section.phases
+      const revenue = sectionPhases.reduce(
+        (sum, phase) => sum + phase.price * phase.quantitySold,
+        0,
+      );
+      const velocityValues = sectionPhases
         .map((phase) =>
           computeTicketsPerHour(
-            parseNumber(phase.quantitySold),
+            phase.quantitySold,
             phase.salesStart,
             phase.salesEnd,
           ),
@@ -379,12 +410,12 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
           )
         : 0;
 
-      const livePhase = section.phases.find((phase) => phase.status === "live");
-      const upcomingPhase = section.phases.find((phase) => phase.status === "upcoming");
+      const livePhase = sectionPhases.find((phase) => phase.status === "live");
+      const upcomingPhase = sectionPhases.find((phase) => phase.status === "upcoming");
       const statusLabel = livePhase
-        ? livePhase.name
+        ? livePhase.phaseName
         : upcomingPhase
-          ? upcomingPhase.name
+          ? upcomingPhase.phaseName
           : "Sold Out";
 
       return {
@@ -396,25 +427,23 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         statusLabel,
       };
     });
-  }, [sections]);
+  }, [phasesBySection, sections]);
 
   const boundaryTimestamps = useMemo(() => {
-    return sections
-      .flatMap((section) =>
-        section.phases.flatMap((phase) => {
-          const points: number[] = [];
-          if (phase.salesStart) {
-            points.push(new Date(phase.salesStart).getTime());
-          }
-          if (phase.salesEnd) {
-            points.push(new Date(phase.salesEnd).getTime());
-          }
-          return points;
-        }),
-      )
+    return normalizedPhases
+      .flatMap((phase) => {
+        const points: number[] = [];
+        if (phase.salesStart) {
+          points.push(new Date(phase.salesStart).getTime());
+        }
+        if (phase.salesEnd) {
+          points.push(new Date(phase.salesEnd).getTime());
+        }
+        return points;
+      })
       .filter((timestamp) => Number.isFinite(timestamp) && timestamp <= anchorTimestamp)
       .sort((a, b) => a - b);
-  }, [anchorTimestamp, sections]);
+  }, [anchorTimestamp, normalizedPhases]);
 
   const ticketsSoldPoints = useMemo(() => {
     const timestamps = buildDailyRange(boundaryTimestamps, anchorTimestamp);
@@ -423,43 +452,33 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
       label: formatAxisLabel(timestamp),
       timestamp,
       value: Math.round(
-        sections.reduce(
-          (sum, section) =>
+        normalizedPhases.reduce(
+          (sum, phase) =>
             sum +
-            section.phases.reduce(
-              (inner, phase) =>
-                inner +
-                soldByTime(
-                  parseNumber(phase.quantitySold),
-                  phase.salesStart,
-                  phase.salesEnd,
-                  timestamp,
-                ),
-              0,
+            soldByTime(
+              phase.quantitySold,
+              phase.salesStart,
+              phase.salesEnd,
+              timestamp,
             ),
           0,
         ),
       ),
     }));
-  }, [anchorTimestamp, boundaryTimestamps, sections]);
+  }, [anchorTimestamp, boundaryTimestamps, normalizedPhases]);
 
   const velocityPoints = useMemo(() => {
     const timestamps = buildDailyRange(boundaryTimestamps, anchorTimestamp);
 
     return timestamps.map((timestamp) => {
-      const totalVelocity = sections.reduce(
-        (sum, section) =>
+      const totalVelocity = normalizedPhases.reduce(
+        (sum, phase) =>
           sum +
-          section.phases.reduce(
-            (inner, phase) =>
-              inner +
-              phaseRateAtTime(
-                parseNumber(phase.quantitySold),
-                phase.salesStart,
-                phase.salesEnd,
-                timestamp,
-              ),
-            0,
+          phaseRateAtTime(
+            phase.quantitySold,
+            phase.salesStart,
+            phase.salesEnd,
+            timestamp,
           ),
         0,
       );
@@ -469,7 +488,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         value: Number(totalVelocity.toFixed(1)),
       };
     });
-  }, [anchorTimestamp, boundaryTimestamps, sections]);
+  }, [anchorTimestamp, boundaryTimestamps, normalizedPhases]);
 
   const visibleTicketsSoldPoints = useMemo(() => {
     if (ticketsWindow === "full") {
@@ -484,25 +503,20 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
       label: formatHourlyAxisLabel(timestamp),
       timestamp,
       value: Math.round(
-        sections.reduce(
-          (sum, section) =>
+        normalizedPhases.reduce(
+          (sum, phase) =>
             sum +
-            section.phases.reduce(
-              (inner, phase) =>
-                inner +
-                soldByTime(
-                  parseNumber(phase.quantitySold),
-                  phase.salesStart,
-                  phase.salesEnd,
-                  timestamp,
-                ),
-              0,
+            soldByTime(
+              phase.quantitySold,
+              phase.salesStart,
+              phase.salesEnd,
+              timestamp,
             ),
           0,
         ),
       ),
     }));
-  }, [anchorTimestamp, sections, ticketsSoldPoints, ticketsWindow]);
+  }, [anchorTimestamp, normalizedPhases, ticketsSoldPoints, ticketsWindow]);
 
   const visibleVelocityPoints = useMemo(() => {
     if (velocityWindow === "full") {
@@ -514,19 +528,14 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
     const hourlyRange = buildTwoHourRange(start, end);
 
     return hourlyRange.map((timestamp) => {
-      const totalVelocity = sections.reduce(
-        (sum, section) =>
+      const totalVelocity = normalizedPhases.reduce(
+        (sum, phase) =>
           sum +
-          section.phases.reduce(
-            (inner, phase) =>
-              inner +
-              phaseRateAtTime(
-                parseNumber(phase.quantitySold),
-                phase.salesStart,
-                phase.salesEnd,
-                timestamp,
-              ),
-            0,
+          phaseRateAtTime(
+            phase.quantitySold,
+            phase.salesStart,
+            phase.salesEnd,
+            timestamp,
           ),
         0,
       );
@@ -536,7 +545,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         value: Number(totalVelocity.toFixed(1)),
       };
     });
-  }, [anchorTimestamp, sections, velocityPoints, velocityWindow]);
+  }, [anchorTimestamp, normalizedPhases, velocityPoints, velocityWindow]);
 
   return (
     <div className="space-y-6">

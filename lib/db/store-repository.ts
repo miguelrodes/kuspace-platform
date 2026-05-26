@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { ArtistProfile, Event, EventApplication, GuestlistEntry, TicketSection } from "@/types/event";
 import type { RecruiterProfile } from "@/types/profile";
 import type { ConsumerUser } from "@/types/user";
+import { getPublicEventWhereInput } from "@/lib/event-status";
 import { prisma } from "@/lib/prisma";
 
 const DRAFT_DATE_SENTINEL = "1970-01-01";
@@ -140,6 +141,14 @@ function toEventScopedId(eventId: string, clientKey: string) {
   return `${eventId}:${clientKey}`;
 }
 
+function getDefaultOrganizationIdForRecruiterProfile(profileId: string) {
+  return `organization-${profileId}`;
+}
+
+function getOrganizationTypeForRecruiterType(recruiterType: RecruiterProfile["recruiterType"]) {
+  return recruiterType === "label" ? "label" : "nightclub";
+}
+
 function deriveGuestlistSummary(entries: GuestlistEntry[]) {
   return {
     ticketsSold: entries.filter((entry) => entry.source === "user").length,
@@ -154,6 +163,8 @@ function mapRecruiterProfileModel(
 ): RecruiterProfile {
   return {
     id: profile.id,
+    clerkUserId: profile.clerkUserId ?? undefined,
+    organizationId: profile.organizationId ?? undefined,
     slug: profile.slug,
     recruiterType: profile.recruiterType,
     realName: profile.realName ?? undefined,
@@ -296,6 +307,7 @@ function mapEventModel(
     admissionMode: event.admissionMode,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
+    organizationId: event.organizationId,
     recruiterProfileId: event.recruiterProfileId,
     cover: {
       title: event.title,
@@ -383,6 +395,7 @@ function mapEventModel(
     })),
     budget: {
       totalBudget: Number(event.totalBudget),
+      doorTicketRevenue: Number(event.doorTicketRevenue),
       items: event.budgetItems.map((item) => ({
         id: item.clientKey ?? item.id,
         category: item.category,
@@ -467,13 +480,34 @@ export async function clearDatabase() {
   await prisma.recruiterProfileStats.deleteMany();
   await prisma.consumerUser.deleteMany();
   await prisma.recruiterProfile.deleteMany();
+  await prisma.organizationMembership.deleteMany();
+  await prisma.organization.deleteMany();
 }
 
 export async function saveRecruiterProfile(profile: RecruiterProfile) {
+  const organizationId = profile.organizationId ?? getDefaultOrganizationIdForRecruiterProfile(profile.id);
+
+  await prisma.organization.upsert({
+    where: { id: organizationId },
+    create: {
+      id: organizationId,
+      slug: profile.slug,
+      name: profile.displayName,
+      type: getOrganizationTypeForRecruiterType(profile.recruiterType),
+    },
+    update: {
+      slug: profile.slug,
+      name: profile.displayName,
+      type: getOrganizationTypeForRecruiterType(profile.recruiterType),
+    },
+  });
+
   await prisma.recruiterProfile.upsert({
     where: { id: profile.id },
     create: {
       id: profile.id,
+      clerkUserId: nullableString(profile.clerkUserId) ?? undefined,
+      organizationId,
       slug: profile.slug,
       recruiterType: profile.recruiterType,
       realName: nullableString(profile.realName) ?? undefined,
@@ -492,6 +526,8 @@ export async function saveRecruiterProfile(profile: RecruiterProfile) {
       mapsLocation: nullableString(profile.links?.mapsLocation) ?? undefined,
     },
     update: {
+      clerkUserId: nullableString(profile.clerkUserId) ?? undefined,
+      organizationId,
       slug: profile.slug,
       recruiterType: profile.recruiterType,
       realName: nullableString(profile.realName) ?? undefined,
@@ -717,6 +753,49 @@ export async function saveEventAggregate(event: Event) {
       lineupEntryReferenceToId.set(entry.id, toEventScopedId(event.id, entry.id));
     }
 
+    let organizationId = event.organizationId;
+
+    if (!organizationId) {
+      const recruiterProfile = await tx.recruiterProfile.findUnique({
+        where: { id: event.recruiterProfileId },
+        select: {
+          id: true,
+          organizationId: true,
+          slug: true,
+          displayName: true,
+          recruiterType: true,
+        },
+      });
+
+      if (!recruiterProfile) {
+        throw new Error(`Recruiter profile ${event.recruiterProfileId} not found while saving event ${event.id}.`);
+      }
+
+      organizationId = recruiterProfile.organizationId ?? getDefaultOrganizationIdForRecruiterProfile(recruiterProfile.id);
+
+      await tx.organization.upsert({
+        where: { id: organizationId },
+        create: {
+          id: organizationId,
+          slug: recruiterProfile.slug,
+          name: recruiterProfile.displayName,
+          type: getOrganizationTypeForRecruiterType(recruiterProfile.recruiterType),
+        },
+        update: {
+          slug: recruiterProfile.slug,
+          name: recruiterProfile.displayName,
+          type: getOrganizationTypeForRecruiterType(recruiterProfile.recruiterType),
+        },
+      });
+
+      if (!recruiterProfile.organizationId) {
+        await tx.recruiterProfile.update({
+          where: { id: recruiterProfile.id },
+          data: { organizationId },
+        });
+      }
+    }
+
     await tx.event.upsert({
       where: { id: event.id },
       create: {
@@ -726,6 +805,7 @@ export async function saveEventAggregate(event: Event) {
         admissionMode: event.admissionMode,
         createdAt: new Date(event.createdAt),
         updatedAt: new Date(event.updatedAt),
+        organizationId,
         recruiterProfileId: event.recruiterProfileId,
         title: event.cover.title,
         description: nullableString(event.cover.description) ?? undefined,
@@ -746,12 +826,14 @@ export async function saveEventAggregate(event: Event) {
         roomSize: event.cover.roomSize,
         numberOfRooms: event.cover.numberOfRooms || 0,
         totalBudget: new Prisma.Decimal(event.budget.totalBudget || 0),
+        doorTicketRevenue: new Prisma.Decimal(event.budget.doorTicketRevenue || 0),
       },
       update: {
         slug: event.slug,
         status: event.status,
         admissionMode: event.admissionMode,
         updatedAt: new Date(),
+        organizationId,
         recruiterProfileId: event.recruiterProfileId,
         title: event.cover.title,
         description: nullableString(event.cover.description) ?? undefined,
@@ -772,6 +854,7 @@ export async function saveEventAggregate(event: Event) {
         roomSize: event.cover.roomSize,
         numberOfRooms: event.cover.numberOfRooms || 0,
         totalBudget: new Prisma.Decimal(event.budget.totalBudget || 0),
+        doorTicketRevenue: new Prisma.Decimal(event.budget.doorTicketRevenue || 0),
       },
     });
 
@@ -1057,6 +1140,62 @@ export async function getRecruiterProfile() {
   return mapRecruiterProfileModel(profile, events.filter((event) => event.recruiterProfileId === profile.id));
 }
 
+export async function getRecruiterProfileSummary() {
+  const profile = await prisma.recruiterProfile.findFirst({
+    include: recruiterProfileInclude,
+  });
+
+  return profile ? mapRecruiterProfileModel(profile) : null;
+}
+
+export async function getRecruiterProfileById(id: string) {
+  const profile = await prisma.recruiterProfile.findUnique({
+    where: { id },
+    include: recruiterProfileInclude,
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  const events = await getAllEvents();
+  return mapRecruiterProfileModel(profile, events.filter((event) => event.recruiterProfileId === profile.id));
+}
+
+export async function getRecruiterProfileByIdSummary(id: string) {
+  const profile = await prisma.recruiterProfile.findUnique({
+    where: { id },
+    include: recruiterProfileInclude,
+  });
+
+  return profile ? mapRecruiterProfileModel(profile) : null;
+}
+
+export async function getRecruiterProfileByOrganizationId(organizationId: string) {
+  const profile = await prisma.recruiterProfile.findFirst({
+    where: { organizationId },
+    include: recruiterProfileInclude,
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  const events = await getEventsByOrganizationId(organizationId);
+  return mapRecruiterProfileModel(profile, events.filter((event) => event.organizationId === organizationId));
+}
+
+export async function getRecruiterProfileByOrganizationIdSummary(organizationId: string) {
+  const profile = await prisma.recruiterProfile.findFirst({
+    where: { organizationId },
+    include: recruiterProfileInclude,
+    orderBy: { createdAt: "asc" },
+  });
+
+  return profile ? mapRecruiterProfileModel(profile) : null;
+}
+
 export async function getAllConsumers() {
   const users = await prisma.consumerUser.findMany({
     include: consumerUserInclude,
@@ -1066,8 +1205,46 @@ export async function getAllConsumers() {
   return users.map(mapConsumerUserModel);
 }
 
+export async function getConsumersByIds(ids: string[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const users = await prisma.consumerUser.findMany({
+    where: {
+      id: {
+        in: ids,
+      },
+    },
+    include: consumerUserInclude,
+    orderBy: { createdAt: "asc" },
+  });
+
+  return users.map(mapConsumerUserModel);
+}
+
 export async function getAllEvents() {
   const events = await prisma.event.findMany({
+    include: eventInclude,
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+  });
+
+  return events.map(mapEventModel);
+}
+
+export async function getPublicEvents() {
+  const events = await prisma.event.findMany({
+    where: getPublicEventWhereInput(),
+    include: eventInclude,
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+  });
+
+  return events.map(mapEventModel);
+}
+
+export async function getEventsByOrganizationId(organizationId: string) {
+  const events = await prisma.event.findMany({
+    where: { organizationId },
     include: eventInclude,
     orderBy: [{ date: "asc" }, { createdAt: "asc" }],
   });

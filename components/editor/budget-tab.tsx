@@ -26,12 +26,13 @@ export type BudgetItemDraft = {
 
 export type BudgetFormState = {
   budgetCap: string;
+  doorTicketRevenue: string;
   items: BudgetItemDraft[];
 };
 
 type BudgetTabProps = {
   value: BudgetFormState;
-  ticketRevenue: number;
+  appTicketRevenue: number;
   onChange: (nextState: BudgetFormState) => void;
 };
 
@@ -270,7 +271,7 @@ function createBudgetItemDraft(draft: ExpenseDraft): BudgetItemDraft {
   };
 }
 
-export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
+export function BudgetTab({ value, appTicketRevenue, onChange }: BudgetTabProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -278,21 +279,26 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
 
   const metrics = useMemo(() => {
     const totalCosts = value.items.reduce((sum, item) => sum + parseAmount(item.amount), 0);
+    const doorTicketRevenue = parseAmount(value.doorTicketRevenue);
+    const totalTicketRevenue = appTicketRevenue + doorTicketRevenue;
     const paid = value.items
       .filter((item) => item.paid)
       .reduce((sum, item) => sum + parseAmount(item.amount), 0);
     const unpaid = totalCosts - paid;
     const budgetRemaining = parseAmount(value.budgetCap) - totalCosts;
-    const net = ticketRevenue - totalCosts;
+    const net = totalTicketRevenue - totalCosts;
 
     return {
       totalCosts,
+      doorTicketRevenue,
+      appTicketRevenue,
+      totalTicketRevenue,
       paid,
       unpaid,
       budgetRemaining,
       net,
     };
-  }, [ticketRevenue, value.budgetCap, value.items]);
+  }, [appTicketRevenue, value.budgetCap, value.doorTicketRevenue, value.items]);
 
   const categories = useMemo(
     () =>
@@ -382,7 +388,7 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
           }
         />
 
-        <div className="-mt-2 grid gap-4 md:grid-cols-[12rem_12rem]">
+        <div className="-mt-2 grid gap-4 md:grid-cols-[12rem]">
           <div>
             <label className="text-body uppercase tracking-widerish text-fg">Budget Cap</label>
             <div className="relative mt-1">
@@ -404,38 +410,70 @@ export function BudgetTab({ value, ticketRevenue, onChange }: BudgetTabProps) {
               />
             </div>
           </div>
-
-          <div>
-            <label className="text-body uppercase tracking-widerish text-fg">Net</label>
-            <div
-              className="mt-1 flex items-center rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-0 text-body text-fg"
-              style={{ height: "1.875rem", minHeight: "1.875rem", maxHeight: "1.875rem" }}
-            >
-              {formatCurrency(metrics.net)}
-            </div>
-          </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Budget Remaining</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.budgetRemaining)}</p>
+        <div className="grid gap-2 md:grid-cols-4">
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Total Ticket Revenue</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.totalTicketRevenue)}</p>
+            </div>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Total Costs</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.totalCosts)}</p>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Budget Remaining</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.budgetRemaining)}</p>
+            </div>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Paid</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.paid)}</p>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Total Cost</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.totalCosts)}</p>
+            </div>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Unpaid</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(metrics.unpaid)}</p>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Net</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.net)}</p>
+            </div>
           </div>
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-1.5">
-            <p className="text-body-sm uppercase tracking-widerish text-muted">Ticket Revenue</p>
-            <p className="mt-1 text-body text-fg">{formatCurrency(ticketRevenue)}</p>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Door Revenue</p>
+              <div className="ml-auto flex w-[5.5rem] items-center justify-end text-body text-fg tabular-nums">
+                <span className="shrink-0 text-right">€&nbsp;</span>
+                <input
+                  value={value.doorTicketRevenue}
+                  inputMode="decimal"
+                  placeholder="0"
+                  className="w-[4rem] bg-transparent p-0 text-right text-body text-fg outline-none placeholder:text-muted"
+                  onChange={(event) =>
+                    onChange({
+                      ...value,
+                      doorTicketRevenue: formatNumberInput(event.target.value),
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">App Revenue</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.appTicketRevenue)}</p>
+            </div>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Paid</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.paid)}</p>
+            </div>
+          </div>
+          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-body-sm uppercase tracking-widerish text-muted">Unpaid</p>
+              <p className="text-body text-fg">{formatCurrency(metrics.unpaid)}</p>
+            </div>
           </div>
         </div>
 

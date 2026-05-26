@@ -6,6 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify:phase4": "npm test && npm run build && npx tsc --noEmit",
+    "verify:phase5": "npm test && npm run build && npx tsc --noEmit",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
@@ -13,10 +17,14 @@
     "prisma:seed": "prisma db seed"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.2.3",
     "@prisma/client": "6.18.0",
+    "@stripe/stripe-js": "^9.3.1",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "stripe": "^22.1.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -30,7 +38,8 @@
     "prisma": "6.18.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

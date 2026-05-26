@@ -1,6 +1,7 @@
 import type {
   Event,
   EventAccessAssignment,
+  EventAccessAssignmentSource,
   EventApplication,
   EventAccessPaymentState,
   GuestlistEntry,
@@ -12,7 +13,6 @@ import type {
 } from "@/types/user";
 import {
   deriveConsumerTicketStatusFromAssignment,
-  isQrActiveForAssignment,
   isQrActiveForPaymentState,
 } from "@/lib/event-access-assignment";
 import {
@@ -22,6 +22,7 @@ import {
 import {
   getVisibleTicketSectionsForAssignment,
 } from "@/lib/event-ticket-visibility";
+import { conflict, notFound } from "@/lib/http/errors";
 
 export function getEventAccessAssignment(
   event: Event,
@@ -77,6 +78,12 @@ export function resolveManualAssignmentPaymentState(
   return accessGroupId === "group-guestlist" ? "not_required" : "pending";
 }
 
+export function getConsumerWalletStatusForPaymentState(
+  paymentState: EventAccessPaymentState,
+): ConsumerTicketStatus {
+  return isQrActiveForPaymentState(paymentState) ? "active" : "inactive";
+}
+
 function buildGuestlistSummary(entries: GuestlistEntry[]) {
   return {
     manualGuests: entries.filter((entry) => entry.source === "manual").length,
@@ -90,12 +97,19 @@ export function syncTicketPurchaseToEvent(
   purchase: {
     userId: string;
     accessGroupId: string;
+    ticketPhaseId?: string;
+    quantity?: number;
     purchasedAt?: string;
     checkedIn?: boolean;
+    paymentState?: EventAccessPaymentState;
+    source?: EventAccessAssignmentSource;
   },
 ): Event {
   const purchasedAt = purchase.purchasedAt ?? new Date().toISOString();
   const checkedIn = purchase.checkedIn ?? false;
+  const paymentState = purchase.paymentState ?? "paid";
+  const source = purchase.source ?? "purchase";
+  const quantity = purchase.quantity ?? 1;
   const existingEntry = event.guestlist.entries.find(
     (entry) => entry.source === "user" && entry.userId === purchase.userId,
   );
@@ -123,14 +137,54 @@ export function syncTicketPurchaseToEvent(
       eventId: event.id,
       userId: purchase.userId,
       accessGroupId: purchase.accessGroupId,
-      source: "purchase" as const,
-      paymentState: "paid" as const,
+      source,
+      paymentState,
       checkedIn: existingAssignment?.checkedIn ?? checkedIn,
       assignedAt: existingAssignment?.assignedAt ?? purchasedAt,
       assignedBy: existingAssignment?.assignedBy,
       notes: existingAssignment?.notes,
     },
   ];
+
+  const nextSections = purchase.ticketPhaseId
+    ? (event.tickets.sections ?? []).map((section) => {
+        const targetPhase = section.phases.find((phase) => phase.id === purchase.ticketPhaseId);
+
+        if (!targetPhase) {
+          return section;
+        }
+
+        if (section.accessGroupId !== purchase.accessGroupId) {
+          throw conflict("Checkout ticket phase does not match the ticket section access group.");
+        }
+
+        return {
+          ...section,
+          phases: section.phases.map((phase) => {
+            if (phase.id !== purchase.ticketPhaseId) {
+              return phase;
+            }
+
+            const quantitySold = phase.quantitySold ?? 0;
+            const nextQuantitySold = quantitySold + quantity;
+
+            if (nextQuantitySold > phase.quantityAvailable) {
+              throw conflict("Confirmed payment would exceed the available ticket inventory.");
+            }
+
+            return {
+              ...phase,
+              quantitySold: nextQuantitySold,
+              status: nextQuantitySold >= phase.quantityAvailable ? "sold_out" : phase.status,
+            };
+          }),
+        };
+      })
+    : event.tickets.sections;
+
+  if (purchase.ticketPhaseId && !(nextSections ?? []).some((section) => section.phases.some((phase) => phase.id === purchase.ticketPhaseId))) {
+    throw notFound("Ticket phase not found");
+  }
 
   return {
     ...event,
@@ -140,6 +194,10 @@ export function syncTicketPurchaseToEvent(
       summary: buildGuestlistSummary(nextEntries),
     },
     accessAssignments: nextAssignments,
+    tickets: {
+      ...event.tickets,
+      sections: nextSections,
+    },
   };
 }
 

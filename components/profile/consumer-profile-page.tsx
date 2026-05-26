@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { ChangeEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EventCard } from "@/components/events/event-card";
 import { EventMetaRow } from "@/components/home/event-meta-row";
@@ -72,6 +73,7 @@ function SettingsModal({
   onPhoneNumberChange,
   onProfileVisibilityChange,
   onNotificationsChange,
+  onSignOut,
   onClose,
 }: {
   email: string;
@@ -84,6 +86,7 @@ function SettingsModal({
   onPhoneNumberChange: (nextPhoneNumber: string) => void;
   onProfileVisibilityChange: (nextVisibility: "public" | "private") => void;
   onNotificationsChange: (nextValue: boolean) => void;
+  onSignOut: () => void;
   onClose: () => void;
 }) {
   return (
@@ -196,6 +199,7 @@ function SettingsModal({
             <button
               type="button"
               className="block text-body text-fg transition hover:text-[var(--accent-hex)]"
+              onClick={onSignOut}
             >
               Log Out
             </button>
@@ -284,11 +288,13 @@ function CityCombobox({
 
 function EventLibraryContent({
   events,
+  recruiterName,
+  recruiterSlug,
 }: {
   events: ReturnType<typeof useMockEventsStore>["events"];
+  recruiterName: string;
+  recruiterSlug: string;
 }) {
-  const { profile } = useMockEventsStore();
-
   return (
     <>
       {events.length === 0 ? (
@@ -311,8 +317,8 @@ function EventLibraryContent({
                 footer={
                   <EventMetaRow
                     location={event.cover.location}
-                    recruiterName={profile.displayName}
-                    recruiterSlug={profile.slug}
+                    recruiterName={recruiterName}
+                    recruiterSlug={recruiterSlug}
                     audience="consumer"
                   />
                 }
@@ -370,8 +376,9 @@ function ArtistsSeenContent({
 }
 
 export function ConsumerProfilePageView() {
+  const { signOut } = useClerk();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { users, events, updateUser, getCurrentConsumerUser } = useMockEventsStore();
+  const { events, profile, updateUser, getCurrentConsumerUser } = useMockEventsStore();
   const hasHydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -384,47 +391,65 @@ export function ConsumerProfilePageView() {
   const [showGenreInput, setShowGenreInput] = useState(false);
 
   const currentUser = getCurrentConsumerUser();
+  const savedEventSlugs = useMemo(
+    () => new Set(currentUser?.savedEventSlugs ?? []),
+    [currentUser?.savedEventSlugs],
+  );
+  const upcomingTicketEventSlugs = useMemo(
+    () => new Set(currentUser?.upcomingTicketEventSlugs ?? []),
+    [currentUser?.upcomingTicketEventSlugs],
+  );
+  const pastTicketEventSlugs = useMemo(
+    () => new Set(currentUser?.pastTicketEventSlugs ?? []),
+    [currentUser?.pastTicketEventSlugs],
+  );
+  const { savedEvents, upcomingEvents, pastEvents, checkedInPastEvents } = useMemo(() => {
+    const nextSavedEvents: typeof events = [];
+    const nextUpcomingEvents: typeof events = [];
+    const nextPastEvents: typeof events = [];
+    const nextCheckedInPastEvents: typeof events = [];
 
-  const savedEvents = useMemo(
-    () => events.filter((event) => currentUser?.savedEventSlugs?.includes(event.slug)),
-    [currentUser?.savedEventSlugs, events],
-  );
-  const upcomingEvents = useMemo(
-    () =>
-      events.filter(
-        (event) =>
-          currentUser?.upcomingTicketEventSlugs?.includes(event.slug) &&
-          event.status !== "past",
-      ),
-    [currentUser?.upcomingTicketEventSlugs, events],
-  );
-  const pastEvents = useMemo(
-    () =>
-      events.filter(
-        (event) =>
-          currentUser?.pastTicketEventSlugs?.includes(event.slug) &&
-          event.status === "past",
-      ),
-    [currentUser?.pastTicketEventSlugs, events],
-  );
-  const checkedInPastEvents = useMemo(
-    () =>
-      pastEvents.filter((event) => {
-        const assignment = event.accessAssignments.find(
-          (candidate) => candidate.userId === currentUser?.id,
+    events.forEach((event) => {
+      if (savedEventSlugs.has(event.slug)) {
+        nextSavedEvents.push(event);
+      }
+
+      if (upcomingTicketEventSlugs.has(event.slug) && event.status !== "past") {
+        nextUpcomingEvents.push(event);
+      }
+
+      if (pastTicketEventSlugs.has(event.slug) && event.status === "past") {
+        nextPastEvents.push(event);
+
+        const checkedInByAssignment = event.accessAssignments.some(
+          (assignment) =>
+            assignment.userId === currentUser?.id && assignment.checkedIn,
         );
-        if (assignment?.checkedIn) {
-          return true;
-        }
-
-        return event.guestlist.entries.some(
+        const checkedInByGuestlist = event.guestlist.entries.some(
           (entry) =>
             entry.checkedIn &&
-            (("userId" in entry && entry.userId === currentUser?.id) || false),
+            ("userId" in entry ? entry.userId === currentUser?.id : entry.userId === currentUser?.id),
         );
-      }),
-    [currentUser?.id, pastEvents],
-  );
+
+        if (checkedInByAssignment || checkedInByGuestlist) {
+          nextCheckedInPastEvents.push(event);
+        }
+      }
+    });
+
+    return {
+      savedEvents: nextSavedEvents,
+      upcomingEvents: nextUpcomingEvents,
+      pastEvents: nextPastEvents,
+      checkedInPastEvents: nextCheckedInPastEvents,
+    };
+  }, [
+    currentUser?.id,
+    events,
+    pastTicketEventSlugs,
+    savedEventSlugs,
+    upcomingTicketEventSlugs,
+  ]);
   const sourceEventsForArtistsSeen =
     checkedInPastEvents.length > 0 ? checkedInPastEvents : pastEvents;
   const artistsSeen = useMemo(() => {
@@ -725,7 +750,11 @@ export function ConsumerProfilePageView() {
                       }
                     />
 
-                    <EventLibraryContent events={activeEvents} />
+                    <EventLibraryContent
+                      events={activeEvents}
+                      recruiterName={profile.displayName}
+                      recruiterSlug={profile.slug}
+                    />
                   </div>
 
                   <div
@@ -791,6 +820,9 @@ export function ConsumerProfilePageView() {
               notificationsEnabled: nextValue,
             })
           }
+          onSignOut={() => {
+            void signOut({ redirectUrl: "/" });
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       ) : null}

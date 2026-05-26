@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
-import type { Event } from "@/types/event";
-import { saveEventAggregate } from "@/lib/db/store-repository";
+import { withRouteHandler, parseJsonBody } from "@/lib/http/route";
+import { createEventService } from "@/lib/services/event-service";
+import { createDraftEventRequestSchema } from "@/lib/validation/store";
 
 export async function POST(request: Request) {
-  const event = (await request.json()) as Event;
-  const savedEvent = await saveEventAggregate(event);
-  return NextResponse.json(savedEvent);
+  return withRouteHandler(async () => {
+    const event = await parseJsonBody(request, createDraftEventRequestSchema);
+    return createEventService(event);
+  }, { successStatus: 201 });
 }

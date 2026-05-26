@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, DIALOG_ACTION_CLASS, DIALOG_FIELD_LABEL_CLASS, DIALOG_TITLE_CLASS } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
@@ -467,8 +467,10 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
   const [newSectionVisibility, setNewSectionVisibility] = useState<TicketSectionVisibility>("public");
   const [newSectionAccessGroupId, setNewSectionAccessGroupId] = useState(accessGroups[0]?.id ?? "");
   const [newSectionAllowedGroupIds, setNewSectionAllowedGroupIds] = useState<string[]>([]);
-  const activeSection =
-    value.sections.find((section) => section.id === value.activeSectionId) ?? value.sections[0];
+  const activeSection = useMemo(
+    () => value.sections.find((section) => section.id === value.activeSectionId) ?? value.sections[0],
+    [value.activeSectionId, value.sections],
+  );
 
   const activeSectionHasSales = activeSection
     ? activeSection.phases.some((phase) => parseNumber(phase.quantitySold) > 0)
@@ -480,10 +482,14 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
     eventStatus !== "past" &&
     value.sections.length > 1 &&
     !(eventStatus === "live" && activeSectionHasSales);
-  const sectionOptions = value.sections.map((section) => ({
-    value: section.id,
-    label: section.name,
-  }));
+  const sectionOptions = useMemo(
+    () =>
+      value.sections.map((section) => ({
+        value: section.id,
+        label: section.name,
+      })),
+    [value.sections],
+  );
   const homeDropdownTriggerClassName =
     "h-7 w-full justify-between gap-1.5 rounded-[var(--radius-button-tag)] bg-transparent px-2.5 py-0 text-body-sm uppercase tracking-widerish text-fg transition hover:opacity-80 disabled:cursor-not-allowed disabled:text-muted";
   const homeDropdownOptionClassName =

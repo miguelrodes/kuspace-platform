@@ -35,25 +35,35 @@ type ManualGuestDraft = {
   username: string;
 };
 
-function getEntryDisplayName(entry: GuestlistEntry, users: ConsumerUser[]) {
+function getEntryDisplayName(
+  entry: GuestlistEntry,
+  usersById: Map<string, ConsumerUser>,
+) {
   if (entry.source === "user") {
-    const user = users.find((candidate) => candidate.id === entry.userId);
+    const user = usersById.get(entry.userId);
     return user ? `${user.firstName} ${user.lastName}` : entry.userId;
   }
 
   return `${entry.firstName} ${entry.lastName}`.trim();
 }
 
-function getEntrySearchText(entry: GuestlistEntry, users: ConsumerUser[]) {
+function getEntrySearchText(
+  entry: GuestlistEntry,
+  usersById: Map<string, ConsumerUser>,
+) {
   if (entry.source === "user") {
-    const user = users.find((candidate) => candidate.id === entry.userId);
+    const user = usersById.get(entry.userId);
     return [user?.firstName, user?.lastName, user?.id, user?.username].filter(Boolean).join(" ").toLowerCase();
   }
 
   return [entry.firstName, entry.lastName, entry.userId].filter(Boolean).join(" ").toLowerCase();
 }
 
-function sortEntries(entries: GuestlistEntry[], users: ConsumerUser[], sort: GuestlistSort) {
+function sortEntries(
+  entries: GuestlistEntry[],
+  usersById: Map<string, ConsumerUser>,
+  sort: GuestlistSort,
+) {
   const nextEntries = [...entries];
 
   if (sort === "default") {
@@ -71,7 +81,11 @@ function sortEntries(entries: GuestlistEntry[], users: ConsumerUser[], sort: Gue
   const factor = sort === "z-a" ? -1 : 1;
 
   return nextEntries.sort(
-    (a, b) => factor * getEntryDisplayName(a, users).localeCompare(getEntryDisplayName(b, users)),
+    (a, b) =>
+      factor *
+      getEntryDisplayName(a, usersById).localeCompare(
+        getEntryDisplayName(b, usersById),
+      ),
   );
 }
 
@@ -364,37 +378,51 @@ export function GuestlistTab({
     () => applications.filter((application) => application.status === "pending"),
     [applications],
   );
+  const usersById = useMemo(
+    () => new Map(users.map((user) => [user.id, user])),
+    [users],
+  );
 
   const visibleEntries = useMemo(() => {
     const query = value.searchQuery.trim().toLowerCase();
     const filtered = query
-      ? value.entries.filter((entry) => getEntrySearchText(entry, users).includes(query))
+      ? value.entries.filter((entry) =>
+          getEntrySearchText(entry, usersById).includes(query),
+        )
       : value.entries;
 
-    return sortEntries(filtered, users, value.sort);
-  }, [users, value.entries, value.searchQuery, value.sort]);
+    return sortEntries(filtered, usersById, value.sort);
+  }, [usersById, value.entries, value.searchQuery, value.sort]);
 
-  const entriesByGroup = useMemo(() => {
-    const map = new Map<string, GuestlistEntry[]>();
-    value.accessGroups.forEach((group) => {
-      map.set(
-        group.id,
-        visibleEntries.filter((entry) => entry.accessGroupId === group.id),
-      );
-    });
-    return map;
-  }, [value.accessGroups, visibleEntries]);
+  const { entriesByGroup, groupTotals } = useMemo(() => {
+    const visibleMap = new Map<string, GuestlistEntry[]>();
+    const totalsMap = new Map<string, number>();
 
-  const groupTotals = useMemo(() => {
-    const totals = new Map<string, number>();
     value.accessGroups.forEach((group) => {
-      totals.set(
-        group.id,
-        value.entries.filter((entry) => entry.accessGroupId === group.id).length,
-      );
+      visibleMap.set(group.id, []);
+      totalsMap.set(group.id, 0);
     });
-    return totals;
-  }, [value.entries, value.accessGroups]);
+
+    value.entries.forEach((entry) => {
+      totalsMap.set(entry.accessGroupId, (totalsMap.get(entry.accessGroupId) ?? 0) + 1);
+    });
+
+    visibleEntries.forEach((entry) => {
+      const entries = visibleMap.get(entry.accessGroupId);
+
+      if (entries) {
+        entries.push(entry);
+        return;
+      }
+
+      visibleMap.set(entry.accessGroupId, [entry]);
+    });
+
+    return {
+      entriesByGroup: visibleMap,
+      groupTotals: totalsMap,
+    };
+  }, [value.accessGroups, value.entries, visibleEntries]);
 
   const handleMove = (entryId: string, accessGroupId: string) => {
     onChange({
@@ -699,7 +727,7 @@ export function GuestlistTab({
                       >
                         <div className="min-w-0">
                           <p className="truncate text-body text-white/74">
-                            {getEntryDisplayName(entry, users)}
+                            {getEntryDisplayName(entry, usersById)}
                           </p>
                         </div>
                         <div className="flex justify-end">

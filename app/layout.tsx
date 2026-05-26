@@ -1,6 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Space_Grotesk } from "next/font/google";
+import { isClerkConfigured } from "@/lib/auth/config";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -9,7 +11,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Nightlife Office MVP",
+  title: "KUSPACE",
   description: "Recruiter back-office for nightlife operators",
 };
 
@@ -21,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body suppressHydrationWarning className={spaceGrotesk.variable}>
-        {children}
+        {isClerkConfigured() ? <ClerkProvider>{children}</ClerkProvider> : children}
       </body>
     </html>
   );

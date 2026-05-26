@@ -171,6 +171,7 @@ export type BudgetItem = {
 
 export type EventBudgetSection = {
   totalBudget: number;
+  doorTicketRevenue: number;
   items: BudgetItem[];
   // UI totals such as paid/unpaid/remaining should be derived from items later.
 };
@@ -227,6 +228,7 @@ export interface Event {
   admissionMode: AdmissionMode;
   createdAt: string;
   updatedAt: string;
+  organizationId?: string;
   // Canonical event owner / editor.
   recruiterProfileId: string;
 

@@ -156,6 +156,7 @@ function buildInitialGuestlistState(event: Event): GuestlistFormState {
 function buildInitialBudgetState(event: Event): BudgetFormState {
   return {
     budgetCap: event.budget.totalBudget ? String(event.budget.totalBudget) : "",
+    doorTicketRevenue: event.budget.doorTicketRevenue ? String(event.budget.doorTicketRevenue) : "",
     items: event.budget.items.map((item) => ({
       id: item.id,
       category: item.category,
@@ -512,6 +513,7 @@ function buildEventAccessAssignments(
 function buildEventBudgetPatch(budgetValue: BudgetFormState) {
   return {
     totalBudget: Number(budgetValue.budgetCap) || 0,
+    doorTicketRevenue: Number(budgetValue.doorTicketRevenue) || 0,
     items: budgetValue.items.map((item) => ({
       id: item.id,
       category: item.category,
@@ -661,7 +663,7 @@ function EventEditorScaffold({
     return (
       <BudgetTab
         value={budgetValue}
-        ticketRevenue={ticketRevenue}
+        appTicketRevenue={ticketRevenue}
         onChange={onBudgetChange}
       />
     );
@@ -686,7 +688,8 @@ export function EventEditorShell(props: EventEditorShellProps) {
   const {
     getEventById,
     createDraftEvent,
-    updateEvent,
+    saveEventEditorSections,
+    updateEventStatus,
     deleteEvent,
     upsertArtists,
     approveCuratedApplication,
@@ -694,14 +697,21 @@ export function EventEditorShell(props: EventEditorShellProps) {
     artists,
     users,
   } = useMockEventsStore();
+  const draftSeedRef = useRef<Event | null>(null);
+
+  if (props.mode === "new" && !draftSeedRef.current) {
+    draftSeedRef.current = createDraftEventSeed();
+  }
+
+  const draftSeed = draftSeedRef.current;
 
   const initialEvent = useMemo(() => {
     if (props.mode === "new") {
-      return createDraftEventSeed();
+      return draftSeed;
     }
 
     return getEventById(props.eventId) ?? null;
-  }, [getEventById, props]);
+  }, [draftSeed, getEventById, props.mode, props.mode === "edit" ? props.eventId : null]);
 
   const [activeTab, setActiveTab] = useState<EditorTab>("cover");
   const [currentEventId, setCurrentEventId] = useState<string | null>(
@@ -711,32 +721,34 @@ export function EventEditorShell(props: EventEditorShellProps) {
     initialEvent?.status ?? "draft",
   );
   const [coverValue, setCoverValue] = useState<CoverFormState>(() =>
-    initialEvent ? buildInitialCoverState(initialEvent, props.mode) : buildInitialCoverState(createDraftEventSeed(), "new"),
+    initialEvent
+      ? buildInitialCoverState(initialEvent, props.mode)
+      : buildInitialCoverState(draftSeed ?? createDraftEventSeed(), "new"),
   );
   const [lineupValue, setLineupValue] = useState<LineupFormState>(() =>
     initialEvent
       ? buildInitialLineupState(initialEvent, artists)
-      : buildInitialLineupState(createDraftEventSeed(), artists),
+      : buildInitialLineupState(draftSeed ?? createDraftEventSeed(), artists),
   );
   const [timetableValue, setTimetableValue] = useState<TimetableFormState>(() =>
     initialEvent
       ? buildInitialTimetableState(initialEvent)
-      : buildInitialTimetableState(createDraftEventSeed()),
+      : buildInitialTimetableState(draftSeed ?? createDraftEventSeed()),
   );
   const [guestlistValue, setGuestlistValue] = useState<GuestlistFormState>(() =>
     initialEvent
       ? buildInitialGuestlistState(initialEvent)
-      : buildInitialGuestlistState(createDraftEventSeed()),
+      : buildInitialGuestlistState(draftSeed ?? createDraftEventSeed()),
   );
   const [budgetValue, setBudgetValue] = useState<BudgetFormState>(() =>
     initialEvent
       ? buildInitialBudgetState(initialEvent)
-      : buildInitialBudgetState(createDraftEventSeed()),
+      : buildInitialBudgetState(draftSeed ?? createDraftEventSeed()),
   );
   const [ticketsValue, setTicketsValue] = useState<TicketsFormState>(() =>
     initialEvent
       ? buildInitialTicketsState(initialEvent)
-      : createEmptyTicketsState(createDraftEventSeed().guestlist.accessGroups),
+      : createEmptyTicketsState((draftSeed ?? createDraftEventSeed()).guestlist.accessGroups),
   );
   const [coverErrors, setCoverErrors] = useState<CoverFieldErrors>({});
   const [timetableRowErrors, setTimetableRowErrors] = useState<Record<string, TimetableRowErrors>>({});
@@ -748,18 +760,12 @@ export function EventEditorShell(props: EventEditorShellProps) {
   const hasMountedRef = useRef(false);
   const isReadOnly = localStatus === "past";
   const isLocked = isLockedEventStatus(localStatus);
-  const isCoverEditableStatus =
-    localStatus === "draft" || localStatus === "upcoming" || localStatus === "live";
-  const isLineupEditableStatus =
-    localStatus === "draft" || localStatus === "upcoming" || localStatus === "live";
-  const isTimetableEditableStatus =
-    localStatus === "draft" || localStatus === "upcoming" || localStatus === "live";
-  const isGuestlistEditableStatus =
-    localStatus === "draft" || localStatus === "upcoming" || localStatus === "live";
-  const isBudgetEditableStatus =
-    localStatus === "draft" || localStatus === "upcoming" || localStatus === "live";
-  const isTicketsEditableStatus =
-    localStatus === "draft" || localStatus === "upcoming" || localStatus === "live";
+  const isCoverEditableStatus = localStatus === "draft";
+  const isLineupEditableStatus = localStatus === "draft";
+  const isTimetableEditableStatus = localStatus === "draft";
+  const isGuestlistEditableStatus = localStatus === "draft";
+  const isBudgetEditableStatus = localStatus === "draft";
+  const isTicketsEditableStatus = localStatus === "draft";
   const isEditableLockedTab =
     (activeTab === "cover" && isCoverEditableStatus) ||
     (activeTab === "lineup" && isLineupEditableStatus) ||
@@ -774,7 +780,7 @@ export function EventEditorShell(props: EventEditorShellProps) {
     setLocalStatus(nextStatus);
   };
 
-  const persistEditorDraft = useCallback((nextStatus: EventStatus) => {
+  const persistEditorDraft = useCallback(async (nextStatus: EventStatus) => {
     if (!initialEvent) {
       return;
     }
@@ -802,7 +808,6 @@ export function EventEditorShell(props: EventEditorShellProps) {
     const lineupPatch = buildEventLineupPatch(lineupValue);
     const timetablePatch = buildEventTimetablePatch(timetableValue);
     const guestlistPatch = buildEventGuestlistPatch(guestlistValue);
-    const accessAssignmentsPatch = buildEventAccessAssignments(initialEvent, guestlistValue, users);
     const budgetPatch = buildEventBudgetPatch(budgetValue);
     const ticketsPatch = buildEventTicketsPatch(ticketsValue, localStatus);
     upsertArtists(lineupValue.selectedArtists);
@@ -828,9 +833,8 @@ export function EventEditorShell(props: EventEditorShellProps) {
     }
 
     if (currentEventId) {
-      updateEvent({
+      await saveEventEditorSections({
         id: currentEventId,
-        status: nextStatus,
         admissionMode: coverValue.admissionMode,
         slug: coverValue.title.trim()
           ? `${slugify(coverValue.title)}-${coverValue.date || new Date().toISOString().slice(0, 10)}`
@@ -839,7 +843,6 @@ export function EventEditorShell(props: EventEditorShellProps) {
         timetable: timetablePatch,
         lineup: lineupPatch,
         guestlist: guestlistPatch,
-        accessAssignments: accessAssignmentsPatch,
         budget: budgetPatch,
         tickets: ticketsPatch,
       });
@@ -847,7 +850,8 @@ export function EventEditorShell(props: EventEditorShellProps) {
       return;
     }
 
-    const createdEvent = createDraftEvent({
+    const accessAssignmentsPatch = buildEventAccessAssignments(initialEvent, guestlistValue, users);
+    const createdEvent = await createDraftEvent({
       status: nextStatus,
       admissionMode: coverValue.admissionMode,
       slug: coverValue.title.trim()
@@ -861,6 +865,10 @@ export function EventEditorShell(props: EventEditorShellProps) {
       budget: budgetPatch,
       tickets: ticketsPatch,
     });
+
+    if (!createdEvent) {
+      return;
+    }
 
     setCurrentEventId(createdEvent.id);
     persistStatus(nextStatus);
@@ -886,13 +894,14 @@ export function EventEditorShell(props: EventEditorShellProps) {
     router,
     ticketsValue,
     timetableValue,
-    updateEvent,
+    saveEventEditorSections,
+    updateEventStatus,
     upsertArtists,
     users,
   ]);
 
   const handleLockEvent = () => {
-    if (isReadOnly) {
+    if (isReadOnly || !initialEvent) {
       return;
     }
 
@@ -911,7 +920,46 @@ export function EventEditorShell(props: EventEditorShellProps) {
       return;
     }
 
-    persistEditorDraft("upcoming");
+    if (currentEventId) {
+      updateEventStatus(currentEventId, "upcoming");
+      persistStatus("upcoming");
+      return;
+    }
+
+    const coverPatch = buildEventCoverPatch(initialEvent, coverValue);
+    const lineupPatch = buildEventLineupPatch(lineupValue);
+    const timetablePatch = buildEventTimetablePatch(timetableValue);
+    const guestlistPatch = buildEventGuestlistPatch(guestlistValue);
+    const accessAssignmentsPatch = buildEventAccessAssignments(initialEvent, guestlistValue, users);
+    const budgetPatch = buildEventBudgetPatch(budgetValue);
+    const ticketsPatch = buildEventTicketsPatch(ticketsValue, localStatus);
+    upsertArtists(lineupValue.selectedArtists);
+
+    void (async () => {
+      const createdEvent = await createDraftEvent({
+        status: "draft",
+        admissionMode: coverValue.admissionMode,
+        slug: coverValue.title.trim()
+          ? `${slugify(coverValue.title)}-${coverValue.date || new Date().toISOString().slice(0, 10)}`
+          : initialEvent.slug,
+        cover: coverPatch,
+        timetable: timetablePatch,
+        lineup: lineupPatch,
+        guestlist: guestlistPatch,
+        accessAssignments: accessAssignmentsPatch,
+        budget: budgetPatch,
+        tickets: ticketsPatch,
+      });
+
+      if (!createdEvent) {
+        return;
+      }
+
+      setCurrentEventId(createdEvent.id);
+      updateEventStatus(createdEvent.id, "upcoming");
+      persistStatus("upcoming");
+      router.replace(`/office/event-editor/${createdEvent.id}`);
+    })();
   };
 
   const applyCoverChange = useCallback(
@@ -987,6 +1035,15 @@ export function EventEditorShell(props: EventEditorShellProps) {
     timetableValue,
   ]);
 
+  const latestEvent = useMemo(
+    () => (currentEventId ? getEventById(currentEventId) : null) ?? initialEvent,
+    [currentEventId, getEventById, initialEvent],
+  );
+  const ticketRevenue = useMemo(
+    () => (latestEvent ? calculateTicketRevenue(latestEvent) : 0),
+    [latestEvent],
+  );
+
   if (!initialEvent) {
     return (
       <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-5">
@@ -995,8 +1052,7 @@ export function EventEditorShell(props: EventEditorShellProps) {
     );
   }
 
-  const latestEvent = (currentEventId ? getEventById(currentEventId) : null) ?? initialEvent;
-  const ticketRevenue = calculateTicketRevenue(latestEvent);
+  const resolvedLatestEvent = latestEvent ?? initialEvent;
 
   return (
     <div className="-mt-6 space-y-2">
@@ -1014,7 +1070,14 @@ export function EventEditorShell(props: EventEditorShellProps) {
               readOnly={isReadOnly}
               onPublish={handlePublishRequest}
               onLock={handleLockEvent}
-              onRevertToDraft={() => persistEditorDraft("draft")}
+              onRevertToDraft={() => {
+                if (!currentEventId) {
+                  return;
+                }
+
+                updateEventStatus(currentEventId, "draft");
+                persistStatus("draft");
+              }}
             />
           </div>
         </div>
@@ -1040,7 +1103,7 @@ export function EventEditorShell(props: EventEditorShellProps) {
             timetableRowErrors={timetableRowErrors}
             availableArtists={artists}
             users={users}
-            applications={latestEvent.applications}
+            applications={resolvedLatestEvent.applications}
             onCoverChange={handleCoverChange}
             onLineupChange={(nextState) => {
               setLineupValue(nextState);
@@ -1160,7 +1223,12 @@ export function EventEditorShell(props: EventEditorShellProps) {
           onClose={() => setShowPublishWarning(false)}
           onConfirm={() => {
             setShowPublishWarning(false);
-            persistEditorDraft("live");
+            if (!currentEventId) {
+              return;
+            }
+
+            updateEventStatus(currentEventId, "live");
+            persistStatus("live");
           }}
         />
       ) : null}

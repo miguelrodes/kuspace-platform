@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { approveCuratedApplication } from "@/lib/event-access";
-import { getEventById, saveEventAggregate } from "@/lib/db/store-repository";
+import { parseJsonBody, parseRouteParams, withRouteHandler } from "@/lib/http/route";
+import { approveCuratedApplicationService } from "@/lib/services/application-service";
+import { approveCuratedApplicationSchema, idAndUserIdParamsSchema } from "@/lib/validation/store";
 
 type RouteContext = {
   params: Promise<{
@@ -10,15 +10,13 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
-  const { id, userId } = await context.params;
-  const { accessGroupId } = (await request.json()) as { accessGroupId: string };
-  const event = await getEventById(id);
-
-  if (!event) {
-    return NextResponse.json(null, { status: 404 });
-  }
-
-  const nextEvent = approveCuratedApplication(event, { userId, accessGroupId });
-  const savedEvent = await saveEventAggregate(nextEvent);
-  return NextResponse.json(savedEvent);
+  return withRouteHandler(async () => {
+    const { id, userId } = await parseRouteParams(context.params, idAndUserIdParamsSchema);
+    const body = await parseJsonBody(request, approveCuratedApplicationSchema);
+    return approveCuratedApplicationService({
+      eventId: id,
+      userId,
+      accessGroupId: body.accessGroupId,
+    });
+  });
 }

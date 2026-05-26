@@ -206,6 +206,7 @@ export function PublicEventDetailPage({
 
   const event = getEventBySlug(slug);
   const currentConsumer = getCurrentConsumerUser();
+  const publicEvents = useMemo(() => getPublicEventCollection(events), [events]);
 
   useEffect(() => {
     if (!event) {
@@ -230,12 +231,11 @@ export function PublicEventDetailPage({
         return [];
       }
 
-      const sourceEvents =
-        audience === "consumer" ? getPublicEventCollection(events) : events;
+      const sourceEvents = audience === "consumer" ? publicEvents : events;
 
       return getRelatedEvents(event, sourceEvents);
     },
-    [audience, event, events],
+    [audience, event, events, publicEvents],
   );
 
   if (!hasHydrated) {
@@ -304,22 +304,38 @@ export function PublicEventDetailPage({
     );
   }
 
-  const labels = resolveEventLabels(event, recruiter);
-  const recruiterProfileHref =
-    audience === "recruiter"
-      ? `/recprofile/${recruiter.slug}`
-      : `/cons/profile/${recruiter.slug}`;
-  const currentAssignment =
-    audience === "consumer" ? getEventAccessAssignment(event, currentConsumer?.id) : undefined;
-  const currentApplication =
-    audience === "consumer" ? getEventApplication(event, currentConsumer?.id) : undefined;
+  const labels = useMemo(() => resolveEventLabels(event, recruiter), [event, recruiter]);
+  const recruiterProfileHref = useMemo(
+    () =>
+      audience === "recruiter"
+        ? `/recprofile/${recruiter.slug}`
+        : `/cons/profile/${recruiter.slug}`,
+    [audience, recruiter.slug],
+  );
+  const currentAssignment = useMemo(
+    () =>
+      audience === "consumer" && currentConsumer?.id
+        ? getEventAccessAssignment(event, currentConsumer.id)
+        : undefined,
+    [audience, currentConsumer?.id, event],
+  );
+  const currentApplication = useMemo(
+    () =>
+      audience === "consumer" && currentConsumer?.id
+        ? getEventApplication(event, currentConsumer.id)
+        : undefined,
+    [audience, currentConsumer?.id, event],
+  );
 
-  const visibleTicketSections =
-    audience === "consumer"
-      ? getVisibleTicketSectionsForAssignment(event, currentAssignment)
-      : (event.tickets.sections ?? []).filter(
-          (section) => section.visibility === "public" && section.phases.length > 0,
-        );
+  const visibleTicketSections = useMemo(
+    () =>
+      audience === "consumer"
+        ? getVisibleTicketSectionsForAssignment(event, currentAssignment)
+        : (event.tickets.sections ?? []).filter(
+            (section) => section.visibility === "public" && section.phases.length > 0,
+          ),
+    [audience, currentAssignment, event],
+  );
   const showTicketsSection =
     isPublicEventStatus(event.status) &&
     event.status !== "past" &&

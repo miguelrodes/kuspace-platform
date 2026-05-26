@@ -1,5 +1,7 @@
 import { EditorTabs } from "@/components/layout/editor-tabs";
 import { OfficeShell } from "@/components/layout/office-shell";
+import { requireOfficeRecruiterNavigation } from "@/lib/auth/office-navigation";
+import { getCurrentAppActorService } from "@/lib/services/auth-actor-service";
 import type { EditorTab } from "@/types/event";
 
 const defaultTab: EditorTab = "cover";
@@ -11,6 +13,9 @@ type EditEventPageProps = {
 };
 
 export default async function EditEventPage({ params }: EditEventPageProps) {
+  const actor = await getCurrentAppActorService();
+  requireOfficeRecruiterNavigation(actor);
+
   const { id } = await params;
 
   return (

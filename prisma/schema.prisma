@@ -92,10 +92,30 @@ enum RecruiterType {
   label
 }
 
+enum OrganizationType {
+  nightclub
+  label
+  independent_organizer
+}
+
+enum OrganizationMembershipRole {
+  owner
+  member
+}
+
 enum ConsumerTicketStatus {
   active
   inactive
   scanned
+}
+
+enum TicketOrderStatus {
+  pending
+  checkout_started
+  paid
+  payment_failed
+  cancelled
+  expired
 }
 
 enum ProfileVisibility {
@@ -103,11 +123,50 @@ enum ProfileVisibility {
   private
 }
 
+/// Recruiter workspaces are the recruiter-side security and ownership boundary.
+/// RecruiterProfile remains the branded/public-facing entity for current UI surfaces.
+model Organization {
+  id                String                   @id @default(uuid())
+  slug              String                   @unique
+  name              String
+  type              OrganizationType
+  stripeAccountId   String?                  @unique
+  stripeChargesEnabled Boolean               @default(false)
+  stripePayoutsEnabled Boolean               @default(false)
+  stripeDetailsSubmitted Boolean             @default(false)
+  stripeOnboardingStartedAt DateTime?
+  stripeOnboardingCompletedAt DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  recruiterProfiles RecruiterProfile[]
+  events            Event[]
+  memberships       OrganizationMembership[]
+  ticketOrders      TicketOrder[]
+
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String                     @id @default(uuid())
+  organizationId String
+  clerkUserId    String
+  role           OrganizationMembershipRole
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, clerkUserId])
+  @@index([clerkUserId])
+  @@map("organization_memberships")
+}
+
 /// Recruiter profiles follow the current app model:
 /// recruiterType is the only recruiter classification field.
 /// Legacy promoter/kind concepts are intentionally not part of persistence.
 model RecruiterProfile {
   id                  String                  @id @default(uuid())
+  clerkUserId         String?                 @unique
+  organizationId      String?
   slug                String                  @unique
   recruiterType       RecruiterType
   realName            String?
@@ -128,10 +187,12 @@ model RecruiterProfile {
   updatedAt           DateTime                @updatedAt
   stats               RecruiterProfileStats?
   soundProfile        RecruiterSoundProfile?
+  organization        Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   events              Event[]
   labels              EventLabel[]            @relation("LabelRecruiterProfile")
 
   @@index([recruiterType])
+  @@index([organizationId])
   @@map("recruiter_profiles")
 }
 
@@ -187,6 +248,7 @@ model RecruiterSoundProfileRoom {
 
 model ConsumerUser {
   id                     String                       @id @default(uuid())
+  clerkUserId            String?                      @unique
   username               String                       @unique
   firstName              String
   lastName               String
@@ -203,6 +265,7 @@ model ConsumerUser {
   upcomingTicketEvents   ConsumerUserUpcomingTicketEvent[]
   pastTicketEvents       ConsumerUserPastTicketEvent[]
   ticketWalletEntries    ConsumerTicketWalletEntry[]
+  ticketOrders           TicketOrder[]
   eventAccessAssignments EventAccessAssignment[]
   eventApplications      EventApplication[]
   guestlistEntries       GuestlistEntry[]
@@ -288,6 +351,7 @@ model Event {
   admissionMode     AdmissionMode
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
+  organizationId    String
   recruiterProfileId String
   /// Cover fields persisted directly on Event.
   title             String
@@ -315,6 +379,9 @@ model Event {
   /// Event budget section headline value. Derived UI metrics like paid,
   /// unpaid, remaining, and totals should still come from BudgetItem rows.
   totalBudget       Decimal                   @default(0) @db.Decimal(12, 2)
+  /// Manual door-sales revenue tracked separately from in-app checkout orders.
+  doorTicketRevenue Decimal                   @default(0) @db.Decimal(12, 2)
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   recruiterProfile  RecruiterProfile          @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
   genres            EventGenre[]
   rooms             EventRoom[]
@@ -326,6 +393,7 @@ model Event {
   guestlistEntries  GuestlistEntry[]
   budgetItems       BudgetItem[]
   ticketSections    TicketSection[]
+  ticketOrders      TicketOrder[]
   labelLinks        EventLabelLink[]
   savedByUsers      ConsumerUserSavedEvent[]
   upcomingTicketUsers ConsumerUserUpcomingTicketEvent[]
@@ -334,6 +402,8 @@ model Event {
 
   @@index([status])
   @@index([admissionMode])
+  @@index([organizationId])
+  @@index([organizationId, status])
   @@index([recruiterProfileId, status])
   @@index([admissionMode, status])
   @@index([recruiterProfileId])
@@ -580,6 +650,7 @@ model TicketSection {
   accessGroup       AccessGroup               @relation(fields: [accessGroupId], references: [id], onDelete: Restrict)
   allowedGroups     TicketSectionAllowedGroup[]
   phases            TicketTier[]
+  orderItems        TicketOrderItem[]
 
   @@unique([eventId, sortOrder])
   @@index([eventId])
@@ -624,6 +695,7 @@ model TicketTier {
   ticketSection      TicketSection        @relation(fields: [ticketSectionId], references: [id], onDelete: Cascade)
   releaseAfterTier   TicketTier?          @relation("TicketTierReleaseChain", fields: [releaseAfterTierId], references: [id], onDelete: SetNull)
   releasesNext       TicketTier[]         @relation("TicketTierReleaseChain")
+  orderItems         TicketOrderItem[]    @relation("TicketOrderItemPhase")
 
   @@unique([ticketSectionId, sortOrder])
   @@index([ticketSectionId])
@@ -631,6 +703,60 @@ model TicketTier {
   @@index([clientKey])
   @@index([status])
   @@map("event_ticket_tiers")
+}
+
+/// Ticket orders are the canonical commerce/payment records for ticket purchases.
+/// They are distinct from wallet entries and access assignments:
+/// - wallet entries are the consumer-visible owned ticket surface
+/// - access assignments are the operational event-admission surface
+/// - orders are the payment/history surface
+model TicketOrder {
+  id                     String            @id @default(uuid())
+  eventId                String
+  organizationId         String
+  consumerUserId         String
+  status                 TicketOrderStatus @default(pending)
+  currency               String
+  subtotalAmount         Decimal           @db.Decimal(12, 2)
+  totalAmount            Decimal           @db.Decimal(12, 2)
+  stripeConnectedAccountId String?
+  stripeCheckoutSessionId String?          @unique
+  stripePaymentIntentId  String?           @unique
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  event                  Event             @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  organization           Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  consumerUser           ConsumerUser      @relation(fields: [consumerUserId], references: [id], onDelete: Restrict)
+  items                  TicketOrderItem[]
+
+  @@index([eventId])
+  @@index([organizationId])
+  @@index([consumerUserId])
+  @@index([status])
+  @@index([stripeConnectedAccountId])
+  @@map("ticket_orders")
+}
+
+/// Ticket order items are the normalized purchasable lines under a TicketOrder.
+/// ticketPhaseId intentionally points at TicketTier because the current app uses
+/// "phase" as the product concept while persistence already models that layer as TicketTier.
+model TicketOrderItem {
+  id             String       @id @default(uuid())
+  orderId        String
+  ticketSectionId String
+  ticketPhaseId  String
+  quantity       Int
+  unitPrice      Decimal      @db.Decimal(12, 2)
+  totalPrice     Decimal      @db.Decimal(12, 2)
+  createdAt      DateTime     @default(now())
+  order          TicketOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketSection  TicketSection @relation(fields: [ticketSectionId], references: [id], onDelete: Restrict)
+  ticketPhase    TicketTier   @relation("TicketOrderItemPhase", fields: [ticketPhaseId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([ticketSectionId])
+  @@index([ticketPhaseId])
+  @@map("ticket_order_items")
 }
 
 /// Event labels are normalized separately from Event so one event can attach

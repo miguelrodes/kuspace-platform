@@ -407,12 +407,16 @@ export function ConsumerTicketsPage() {
     () => currentUser?.ticketWalletEntries ?? [],
     [currentUser?.ticketWalletEntries],
   );
+  const eventsBySlug = useMemo(
+    () => new Map(events.map((event) => [event.slug, event])),
+    [events],
+  );
 
   const ticketCards = useMemo(
     () =>
       ticketEntries
         .map((entry) => {
-          const event = events.find((candidate) => candidate.slug === entry.eventSlug);
+          const event = eventsBySlug.get(entry.eventSlug);
           if (!event) {
             return null;
           }
@@ -444,29 +448,58 @@ export function ConsumerTicketsPage() {
           const rightTime = new Date(`${right.event.cover.date}T00:00:00.000Z`).getTime();
           return leftTime - rightTime;
         }),
-    [currentUser?.id, events, ticketEntries],
+    [currentUser?.id, eventsBySlug, ticketEntries],
   );
+  const { upcomingCards, pastCards, ticketCardsBySlug } = useMemo(() => {
+    const nextUpcomingCards: typeof ticketCards = [];
+    const nextPastCards: typeof ticketCards = [];
+    const nextTicketCardsBySlug = new Map<string, typeof ticketCards>();
 
-  const upcomingCards = ticketCards
-    .filter(({ event }) => event.status === "live" && canConsumerAccessEvent(event))
-    .sort((left, right) => {
-      const leftTime = new Date(`${left.event.cover.date}T00:00:00.000Z`).getTime();
-      const rightTime = new Date(`${right.event.cover.date}T00:00:00.000Z`).getTime();
-      return leftTime - rightTime;
+    ticketCards.forEach((ticketCard) => {
+      const existingCards = nextTicketCardsBySlug.get(ticketCard.event.slug);
+
+      if (existingCards) {
+        existingCards.push(ticketCard);
+      } else {
+        nextTicketCardsBySlug.set(ticketCard.event.slug, [ticketCard]);
+      }
+
+      if (!canConsumerAccessEvent(ticketCard.event)) {
+        return;
+      }
+
+      if (ticketCard.event.status === "past") {
+        nextPastCards.push(ticketCard);
+        return;
+      }
+
+      if (ticketCard.event.status === "live") {
+        nextUpcomingCards.push(ticketCard);
+      }
     });
-  const pastCards = ticketCards
-    .filter(({ event }) => event.status === "past" && canConsumerAccessEvent(event))
-    .sort((left, right) => {
+
+    nextPastCards.sort((left, right) => {
       const leftTime = new Date(`${left.event.cover.date}T00:00:00.000Z`).getTime();
       const rightTime = new Date(`${right.event.cover.date}T00:00:00.000Z`).getTime();
       return rightTime - leftTime;
     });
 
-  const activeCards = activeSection === "upcoming" ? upcomingCards : pastCards;
+    return {
+      upcomingCards: nextUpcomingCards,
+      pastCards: nextPastCards,
+      ticketCardsBySlug: nextTicketCardsBySlug,
+    };
+  }, [ticketCards]);
 
-  const selectedCards = selectedEntrySlug
-    ? ticketCards.filter(({ event }) => event.slug === selectedEntrySlug)
-    : [];
+  const activeCards = useMemo(
+    () => (activeSection === "upcoming" ? upcomingCards : pastCards),
+    [activeSection, pastCards, upcomingCards],
+  );
+
+  const selectedCards = useMemo(
+    () => (selectedEntrySlug ? ticketCardsBySlug.get(selectedEntrySlug) ?? [] : []),
+    [selectedEntrySlug, ticketCardsBySlug],
+  );
   const selectedCard = selectedCards[0] ?? null;
   const isHydrating = users.length === 0;
 

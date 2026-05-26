@@ -32,6 +32,7 @@ export function ProfileHero({ profile }: ProfileHeroProps) {
               className="tracking-[0.04em]"
               style={{
                 color: "#FFFFFF",
+                fontFamily: "var(--font-space-grotesk)",
                 fontSize: "2.5rem",
                 lineHeight: "1.1",
               }}
@@ -40,7 +41,13 @@ export function ProfileHero({ profile }: ProfileHeroProps) {
             </h1>
           </div>
 
-          <p className="text-title" style={{ color: "#FFFFFF" }}>
+          <p
+            className="text-heading-sm text-right"
+            style={{
+              color: "#FFFFFF",
+              lineHeight: "1.2",
+            }}
+          >
             {profile.location?.displayText}
           </p>
         </div>
