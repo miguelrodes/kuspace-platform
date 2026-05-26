@@ -1,5 +1,4 @@
 import { currentUser } from "@clerk/nextjs/server";
-import type Stripe from "stripe";
 import { badRequest, conflict, forbidden } from "@/lib/http/errors";
 import { requireAuthenticatedSession } from "@/lib/auth/session";
 import { getCurrentAppActorService } from "@/lib/services/auth-actor-service";
@@ -23,12 +22,11 @@ import {
 import type { RecruiterProfile } from "@/types/profile";
 import { requireCurrentRecruiterProfileService } from "@/lib/services/access-service";
 import { getCurrentWorkspaceService } from "@/lib/services/workspace-service";
-import { getStripeServerClient } from "@/lib/stripe/server";
-import { getStripeConfig } from "@/lib/stripe/config";
-
-type StripeAccountLinkCreateParams = Parameters<
-  ReturnType<typeof getStripeServerClient>["v2"]["core"]["accountLinks"]["create"]
->[0];
+import {
+  createStripeConnectedAccount,
+  createStripeConnectedAccountOnboardingLink,
+  getStripeConnectedAccountStatus,
+} from "@/lib/stripe/stripe-service";
 
 function mapOrganizationTypeToRecruiterType(
   type: CreateOrganizationInput["type"] | UpdateOrganizationInput["type"],
@@ -177,108 +175,19 @@ function getStripeConnectedAccountContactEmail(user: Awaited<ReturnType<typeof c
   return user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses[0]?.emailAddress ?? null;
 }
 
-function buildConnectedAccountCreateParams(params: {
-  organizationId: string;
-  organizationName: string;
-  organizationSlug: string;
-  organizationType: CreateOrganizationInput["type"];
-  contactEmail: string;
-  country?: string;
-}) {
-  return {
-    contact_email: params.contactEmail,
-    dashboard: "express" as const,
-    defaults: {
-      profile: {
-        doing_business_as: params.organizationName,
-        product_description: "Event ticket sales and access managed through KUSPACE.",
-      },
-      responsibilities: {
-        fees_collector: "application" as const,
-        losses_collector: "application" as const,
-      },
-    },
-    display_name: params.organizationName,
-    configuration: {
-      merchant: {
-        capabilities: {
-          card_payments: { requested: true },
-        },
-      },
-      recipient: {
-        capabilities: {
-          stripe_balance: {
-            payouts: { requested: true },
-            stripe_transfers: { requested: true },
-          },
-        },
-      },
-    },
-    ...(params.country ? { identity: { country: params.country } } : {}),
-    metadata: {
-      organizationId: params.organizationId,
-      organizationSlug: params.organizationSlug,
-      organizationType: params.organizationType,
-    },
-  };
-}
-
-function buildStripeHostedOnboardingUseCase(params: {
-  refreshUrl: string;
-  returnUrl: string;
-}): StripeAccountLinkCreateParams["use_case"] {
-  const configurations: Exclude<
-    StripeAccountLinkCreateParams["use_case"]["account_onboarding"],
-    undefined
-  >["configurations"] = ["merchant", "recipient"];
-
-  return {
-    type: "account_onboarding" as const,
-    account_onboarding: {
-      collection_options: {
-        fields: "eventually_due" as const,
-        future_requirements: "include" as const,
-      },
-      configurations,
-      refresh_url: params.refreshUrl,
-      return_url: params.returnUrl,
-    },
-  };
-}
-
-function isCapabilityActive(status?: "active" | "pending" | "restricted" | "unsupported") {
-  return status === "active";
-}
-
-function isStripeDetailsSubmitted(account: Stripe.V2.Core.Account) {
-  return !(
-    account.requirements?.entries?.some((entry) => entry.awaiting_action_from === "user") ?? false
-  );
-}
-
 function buildOrganizationStripeStatusPatch(params: {
   organization: Awaited<ReturnType<typeof getCurrentWorkspaceService>>["organization"];
-  account: Stripe.V2.Core.Account;
+  status: Awaited<ReturnType<typeof getStripeConnectedAccountStatus>>["status"];
 }) {
-  const stripeChargesEnabled = isCapabilityActive(
-    params.account.configuration?.merchant?.capabilities?.card_payments?.status,
-  );
-  const stripePayoutsEnabled = isCapabilityActive(
-    params.account.configuration?.recipient?.capabilities?.stripe_balance?.payouts?.status,
-  );
-  const stripeDetailsSubmitted = isStripeDetailsSubmitted(params.account);
-  const onboardingCompleted =
-    stripeChargesEnabled && stripePayoutsEnabled && stripeDetailsSubmitted;
-
   return {
-    stripeAccountId: params.account.id,
-    stripeChargesEnabled,
-    stripePayoutsEnabled,
-    stripeDetailsSubmitted,
+    stripeAccountId: params.status.stripeAccountId,
+    stripeChargesEnabled: params.status.stripeChargesEnabled,
+    stripePayoutsEnabled: params.status.stripePayoutsEnabled,
+    stripeDetailsSubmitted: params.status.stripeDetailsSubmitted,
     stripeOnboardingStartedAt:
       params.organization.stripeOnboardingStartedAt ? undefined : new Date(),
     stripeOnboardingCompletedAt:
-      onboardingCompleted && !params.organization.stripeOnboardingCompletedAt
+      params.status.onboardingComplete && !params.organization.stripeOnboardingCompletedAt
         ? new Date()
         : undefined,
   };
@@ -310,17 +219,14 @@ export async function createCurrentOrganizationStripeAccountService(
     );
   }
 
-  const stripe = getStripeServerClient();
-  const connectedAccount = await stripe.v2.core.accounts.create(
-    buildConnectedAccountCreateParams({
-      organizationId: organization.id,
-      organizationName: organization.name,
-      organizationSlug: organization.slug,
-      organizationType: organization.type,
-      contactEmail,
-      country: payload.country,
-    }),
-  );
+  const connectedAccount = await createStripeConnectedAccount({
+    organizationId: organization.id,
+    organizationName: organization.name,
+    organizationSlug: organization.slug,
+    organizationType: organization.type,
+    contactEmail,
+    country: payload.country,
+  });
 
   const nextOrganization = await updateOrganizationStripeConnectRepository(organization.id, {
     stripeAccountId: connectedAccount.id,
@@ -336,7 +242,6 @@ export async function createCurrentOrganizationStripeOnboardingLinkService(param
   requestUrl: string;
   country?: string;
 }) {
-  const config = getStripeConfig();
   const { actor, organization } = await getCurrentWorkspaceService();
 
   if (actor.currentOrganizationRole !== "owner") {
@@ -354,23 +259,9 @@ export async function createCurrentOrganizationStripeOnboardingLinkService(param
     stripeAccountCreated = created.stripeAccountCreated;
   }
 
-  const requestOrigin = new URL(params.requestUrl).origin;
-  const refreshUrl = new URL(
-    "/api/workspace/organizations/current/connect-account/onboarding/refresh",
-    requestOrigin,
-  ).toString();
-  const returnUrl = new URL(
-    "/api/workspace/organizations/current/connect-account/onboarding/return",
-    requestOrigin,
-  ).toString();
-
-  const stripe = getStripeServerClient();
-  const accountLink = await stripe.v2.core.accountLinks.create({
-    account: nextOrganization.stripeAccountId!,
-    use_case: buildStripeHostedOnboardingUseCase({
-      refreshUrl,
-      returnUrl,
-    }),
+  const accountLink = await createStripeConnectedAccountOnboardingLink({
+    stripeAccountId: nextOrganization.stripeAccountId!,
+    requestUrl: params.requestUrl,
   });
 
   nextOrganization = await updateOrganizationStripeConnectRepository(nextOrganization.id, {
@@ -382,10 +273,10 @@ export async function createCurrentOrganizationStripeOnboardingLinkService(param
   return {
     organization: nextOrganization,
     stripeAccountCreated,
-    onboardingUrl: accountLink.url,
-    expiresAt: accountLink.expires_at,
-    returnDestination: config.STRIPE_CONNECT_RETURN_URL,
-    refreshDestination: config.STRIPE_CONNECT_REFRESH_URL,
+    onboardingUrl: accountLink.onboardingUrl,
+    expiresAt: accountLink.expiresAt,
+    returnDestination: accountLink.returnDestination,
+    refreshDestination: accountLink.refreshDestination,
   };
 }
 
@@ -400,22 +291,17 @@ export async function syncCurrentOrganizationStripeAccountStatusService() {
     };
   }
 
-  const stripe = getStripeServerClient();
-  const account = await stripe.v2.core.accounts.retrieve(organization.stripeAccountId, {
-    include: ["configuration.merchant", "configuration.recipient", "requirements"],
-  });
+  const { status } = await getStripeConnectedAccountStatus(organization.stripeAccountId);
 
   const patch = buildOrganizationStripeStatusPatch({
     organization,
-    account,
+    status,
   });
   const nextOrganization = await updateOrganizationStripeConnectRepository(organization.id, patch);
-  const onboardingComplete =
-    patch.stripeChargesEnabled && patch.stripePayoutsEnabled && patch.stripeDetailsSubmitted;
 
   return {
     organization: nextOrganization,
     statusSynced: true,
-    onboardingComplete,
+    onboardingComplete: status.onboardingComplete,
   };
 }

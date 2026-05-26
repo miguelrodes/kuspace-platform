@@ -131,6 +131,27 @@ export async function getTicketOrderRepositoryByStripePaymentIntentId(stripePaym
   return order ? mapTicketOrderModel(order as TicketOrderModel) : null;
 }
 
+export async function listTicketOrdersRepositoryByEventId(
+  eventId: string,
+  options?: {
+    status?: TicketOrder["status"];
+  },
+) {
+  const orders = await prisma.ticketOrder.findMany({
+    where: {
+      eventId,
+      ...(options?.status ? { status: options.status } : {}),
+    },
+    include: ticketOrderInclude,
+    orderBy: [
+      { updatedAt: "desc" },
+      { createdAt: "desc" },
+    ],
+  });
+
+  return orders.map((order) => mapTicketOrderModel(order as TicketOrderModel));
+}
+
 export async function updateTicketOrderRepository(
   id: string,
   input: Partial<Pick<

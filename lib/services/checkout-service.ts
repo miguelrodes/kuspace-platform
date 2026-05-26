@@ -18,13 +18,20 @@ import {
 } from "@/lib/services/order-service";
 import { requireOwnedConsumerUserService } from "@/lib/services/access-service";
 import { requireConsumerActor } from "@/lib/auth/actor";
-import { getStripeConfig, isStripeConfigured } from "@/lib/stripe/config";
-import { getStripeServerClient } from "@/lib/stripe/server";
 import {
   checkoutIntentPaymentTransitionSchema,
   createCheckoutIntentServiceSchema,
   stripeWebhookMutationSchema,
 } from "@/lib/validation/store";
+import { isStripeConfigured } from "@/lib/stripe/config";
+import {
+  createStripeCheckoutSession,
+  getStripeCheckoutSessionOrderReference,
+  normalizeStripeEventToTicketOrderEvent,
+  retrieveStripeCheckoutSession,
+  verifyStripeWebhookEvent,
+  type StripeTicketOrderReference,
+} from "@/lib/stripe/stripe-service";
 import type { Event } from "@/types/event";
 import type { TicketOrder } from "@/types/order";
 import type { ConsumerUser } from "@/types/user";
@@ -33,9 +40,8 @@ import type {
   TicketCheckoutIntentResult,
   TicketCheckoutStatusResult,
   TicketOrderPaymentTransitionResult,
+  CheckoutProvider,
 } from "@/types/checkout";
-
-type CheckoutProvider = "internal" | "stripe";
 type OrderTransitionStatus = "paid" | "payment_failed" | "cancelled" | "expired";
 
 type ResolvedCheckoutContext = {
@@ -180,11 +186,11 @@ function buildCheckoutIntentResult(
   options?: {
     stripeCheckoutUrl?: string;
     stripeOnBehalfOfAccountId?: string;
+    successUrl?: string;
+    cancelUrl?: string;
   },
 ): TicketCheckoutIntentResult {
   const requiresWebhookConfirmation = context.amountTotal > 0 && context.provider === "stripe";
-  const stripeConfig =
-    requiresWebhookConfirmation && isStripeConfigured() ? getStripeConfig() : null;
 
   return {
     order,
@@ -223,8 +229,8 @@ function buildCheckoutIntentResult(
       stripeCheckoutSessionId: order.stripeCheckoutSessionId,
       stripeCheckoutUrl: options?.stripeCheckoutUrl,
       stripeOnBehalfOfAccountId: options?.stripeOnBehalfOfAccountId,
-      successUrl: stripeConfig?.STRIPE_CHECKOUT_SUCCESS_URL,
-      cancelUrl: stripeConfig?.STRIPE_CHECKOUT_CANCEL_URL,
+      successUrl: requiresWebhookConfirmation ? options?.successUrl : undefined,
+      cancelUrl: requiresWebhookConfirmation ? options?.cancelUrl : undefined,
     },
   };
 }
@@ -247,30 +253,7 @@ async function createTicketOrderFromContext(context: ResolvedCheckoutContext) {
   });
 }
 
-function toStripeAmountMinorUnits(amount: number) {
-  return Math.round(amount * 100);
-}
-
-function buildCheckoutRedirectUrl(baseUrl: string, params: Record<string, string>) {
-  const destination = new URL(baseUrl);
-
-  for (const [key, value] of Object.entries(params)) {
-    destination.searchParams.set(key, value);
-  }
-
-  return destination.toString();
-}
-
-function buildStripeCheckoutMetadata(order: TicketOrder) {
-  return {
-    orderId: order.id,
-    eventId: order.eventId,
-    organizationId: order.organizationId,
-    consumerUserId: order.consumerUserId,
-  };
-}
-
-function buildStripeCheckoutLineItems(
+function buildStripeCheckoutSessionLineItems(
   context: ResolvedCheckoutContext,
   order: TicketOrder,
 ) {
@@ -279,35 +262,12 @@ function buildStripeCheckoutLineItems(
 
     return {
       quantity: item.quantity,
-      price_data: {
-        currency: order.currency.toLowerCase(),
-        unit_amount: toStripeAmountMinorUnits(item.unitPrice),
-        product_data: {
-          name: section.name,
-          description: `${context.event.cover.title} · ${phase.name}`,
-        },
-      },
+      unitAmount: item.unitPrice,
+      currency: order.currency,
+      productName: section.name,
+      productDescription: phase.name,
     };
   });
-}
-
-async function getStripeCheckoutOnBehalfOfAccountId(stripeConnectedAccountId: string) {
-  const stripe = getStripeServerClient();
-  const [platformAccount, connectedAccount] = await Promise.all([
-    stripe.accounts.retrieve(null),
-    stripe.v2.core.accounts.retrieve(stripeConnectedAccountId, {
-      include: ["identity"],
-    }),
-  ]);
-
-  const platformCountry = platformAccount.country?.toUpperCase() ?? null;
-  const connectedCountry = connectedAccount.identity?.country?.toUpperCase() ?? null;
-
-  if (!platformCountry || !connectedCountry) {
-    return undefined;
-  }
-
-  return platformCountry !== connectedCountry ? stripeConnectedAccountId : undefined;
 }
 
 async function createStripeCheckoutSessionForOrder(
@@ -320,46 +280,13 @@ async function createStripeCheckoutSessionForOrder(
     throw conflict("Ticket checkout requires an event-owning organization.");
   }
 
-  const config = getStripeConfig();
-  const metadata = buildStripeCheckoutMetadata(order);
-  const stripeOnBehalfOfAccountId =
-    await getStripeCheckoutOnBehalfOfAccountId(stripeConnectedAccountId);
-  const stripe = getStripeServerClient();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    client_reference_id: order.id,
-    customer_email: context.user.email,
-    success_url: buildCheckoutRedirectUrl(config.STRIPE_CHECKOUT_SUCCESS_URL, {
-      orderId: order.id,
-      session_id: "{CHECKOUT_SESSION_ID}",
-    }),
-    cancel_url: buildCheckoutRedirectUrl(config.STRIPE_CHECKOUT_CANCEL_URL, {
-      orderId: order.id,
-    }),
-    line_items: buildStripeCheckoutLineItems(context, order),
-    metadata,
-    payment_intent_data: {
-      metadata,
-      transfer_data: {
-        destination: stripeConnectedAccountId,
-      },
-      ...(stripeOnBehalfOfAccountId
-        ? { on_behalf_of: stripeOnBehalfOfAccountId }
-        : {}),
-    },
+  return createStripeCheckoutSession({
+    order,
+    customerEmail: context.user.email,
+    eventTitle: context.event.cover.title,
+    stripeConnectedAccountId,
+    lineItems: buildStripeCheckoutSessionLineItems(context, order),
   });
-
-  if (!session.url) {
-    throw conflict("Stripe Checkout did not return a redirect URL.");
-  }
-
-  const sessionUrl = session.url;
-
-  return {
-    session,
-    sessionUrl,
-    stripeOnBehalfOfAccountId,
-  };
 }
 
 function getOrderPaymentState(order: TicketOrder) {
@@ -508,17 +435,6 @@ function getCheckoutReturnState(params: {
   return "processing" as const;
 }
 
-function getStripeCheckoutSessionPaymentIntentId(session: Stripe.Checkout.Session) {
-  return typeof session.payment_intent === "string"
-    ? session.payment_intent
-    : session.payment_intent?.id;
-}
-
-function getStripePaymentIntentOrderId(paymentIntent: Stripe.PaymentIntent) {
-  const orderId = paymentIntent.metadata?.orderId;
-  return typeof orderId === "string" && orderId.length > 0 ? orderId : undefined;
-}
-
 async function getOwnedConsumerTicketOrder(params: {
   orderId?: string;
   stripeCheckoutSessionId?: string;
@@ -541,16 +457,18 @@ async function getOwnedConsumerTicketOrder(params: {
   return order;
 }
 
-async function maybeSyncOrderStripeReferencesFromCheckoutSession(params: {
+async function maybeSyncOrderStripeReferences(params: {
   order: TicketOrder;
-  stripeSession: Stripe.Checkout.Session;
+  orderReference: StripeTicketOrderReference;
 }) {
+  const stripeConnectedAccountId =
+    params.orderReference.stripeConnectedAccountId ?? params.order.stripeConnectedAccountId;
+  const stripeCheckoutSessionId =
+    params.orderReference.stripeCheckoutSessionId ?? params.order.stripeCheckoutSessionId;
   const stripePaymentIntentId =
-    typeof params.stripeSession.payment_intent === "string"
-      ? params.stripeSession.payment_intent
-      : params.stripeSession.payment_intent?.id;
-  const stripeCheckoutSessionId = params.stripeSession.id;
+    params.orderReference.stripePaymentIntentId ?? params.order.stripePaymentIntentId;
   const needsUpdate =
+    params.order.stripeConnectedAccountId !== stripeConnectedAccountId ||
     params.order.stripeCheckoutSessionId !== stripeCheckoutSessionId ||
     params.order.stripePaymentIntentId !== stripePaymentIntentId;
 
@@ -561,7 +479,7 @@ async function maybeSyncOrderStripeReferencesFromCheckoutSession(params: {
   return updateTicketOrderStatusService({
     orderId: params.order.id,
     status: params.order.status,
-    stripeConnectedAccountId: params.order.stripeConnectedAccountId,
+    stripeConnectedAccountId,
     stripeCheckoutSessionId,
     stripePaymentIntentId,
   });
@@ -581,7 +499,14 @@ export async function createCheckoutIntentService(params: {
   const order = await createTicketOrderFromContext(context);
 
   if (context.provider === "stripe" && context.amountTotal > 0) {
-    const { session, sessionUrl, stripeOnBehalfOfAccountId } = await createStripeCheckoutSessionForOrder(
+    const {
+      sessionId,
+      sessionUrl,
+      paymentIntentId,
+      stripeOnBehalfOfAccountId,
+      successUrl,
+      cancelUrl,
+    } = await createStripeCheckoutSessionForOrder(
       context,
       order,
     );
@@ -589,16 +514,15 @@ export async function createCheckoutIntentService(params: {
       orderId: order.id,
       status: "checkout_started",
       stripeConnectedAccountId: context.stripeConnectedAccountId,
-      stripeCheckoutSessionId: session.id,
-      stripePaymentIntentId:
-        typeof session.payment_intent === "string"
-          ? session.payment_intent
-          : session.payment_intent?.id,
+      stripeCheckoutSessionId: sessionId,
+      stripePaymentIntentId: paymentIntentId,
     });
 
     return buildCheckoutIntentResult(context, checkoutStartedOrder, {
       stripeCheckoutUrl: sessionUrl,
       stripeOnBehalfOfAccountId,
+      successUrl,
+      cancelUrl,
     });
   }
 
@@ -615,13 +539,19 @@ export async function getTicketCheckoutStatusService(params: {
   let stripeSession: Stripe.Checkout.Session | null = null;
 
   if (stripeCheckoutSessionId && isStripeConfigured()) {
-    const stripe = getStripeServerClient();
-    stripeSession = await stripe.checkout.sessions.retrieve(stripeCheckoutSessionId);
-    order = await maybeSyncOrderStripeReferencesFromCheckoutSession({
+    stripeSession = await retrieveStripeCheckoutSession(stripeCheckoutSessionId);
+    order = await maybeSyncOrderStripeReferences({
       order,
-      stripeSession,
+      orderReference: getStripeCheckoutSessionOrderReference(
+        stripeSession,
+        order.stripeConnectedAccountId,
+      ),
     });
   }
+
+  const stripeSessionPaymentIntentId = stripeSession
+    ? getStripeCheckoutSessionOrderReference(stripeSession).stripePaymentIntentId
+    : undefined;
 
   return {
     order,
@@ -633,38 +563,34 @@ export async function getTicketCheckoutStatusService(params: {
       stripeConnectedAccountId: order.stripeConnectedAccountId,
       stripeCheckoutSessionId:
         stripeSession?.id ?? stripeCheckoutSessionId ?? order.stripeCheckoutSessionId,
-      stripePaymentIntentId:
-        (typeof stripeSession?.payment_intent === "string"
-          ? stripeSession.payment_intent
-          : stripeSession?.payment_intent?.id) ?? order.stripePaymentIntentId,
+      stripePaymentIntentId: stripeSessionPaymentIntentId ?? order.stripePaymentIntentId,
       stripeSessionStatus: stripeSession?.status ?? null,
       stripePaymentStatus: stripeSession?.payment_status ?? null,
     },
   };
 }
 
-async function handleCheckoutSessionWebhookEvent(
-  session: Stripe.Checkout.Session,
-  status?: OrderTransitionStatus,
-  occurredAt?: string,
-) {
-  const order = await getTicketOrderByWebhookReference({
-    orderId: typeof session.metadata?.orderId === "string" ? session.metadata.orderId : undefined,
-    stripeCheckoutSessionId: session.id,
-    stripePaymentIntentId: getStripeCheckoutSessionPaymentIntentId(session),
-  });
+export async function handleStripeEventService(event: Stripe.Event) {
+  const normalized = normalizeStripeEventToTicketOrderEvent(event);
+
+  if (!normalized.handled) {
+    return normalized;
+  }
+
+  const order = await getTicketOrderByWebhookReference(normalized.orderReference);
 
   if (!order) {
     throw notFound("Ticket order not found");
   }
 
-  const syncedOrder = await maybeSyncOrderStripeReferencesFromCheckoutSession({
+  const syncedOrder = await maybeSyncOrderStripeReferences({
     order,
-    stripeSession: session,
+    orderReference: normalized.orderReference,
   });
 
-  if (!status) {
+  if (!normalized.transitionStatus) {
     return {
+      eventType: normalized.eventType,
       order: syncedOrder,
       fulfilled: false,
       handled: false,
@@ -673,126 +599,28 @@ async function handleCheckoutSessionWebhookEvent(
 
   const result = await handleStripeWebhookService({
     orderId: syncedOrder.id,
-    status,
-    stripeConnectedAccountId: syncedOrder.stripeConnectedAccountId,
-    stripeCheckoutSessionId: syncedOrder.stripeCheckoutSessionId ?? session.id,
+    status: normalized.transitionStatus,
+    stripeConnectedAccountId:
+      normalized.orderReference.stripeConnectedAccountId ?? syncedOrder.stripeConnectedAccountId,
+    stripeCheckoutSessionId:
+      normalized.orderReference.stripeCheckoutSessionId ?? syncedOrder.stripeCheckoutSessionId,
     stripePaymentIntentId:
-      syncedOrder.stripePaymentIntentId ?? getStripeCheckoutSessionPaymentIntentId(session),
-    occurredAt,
+      normalized.orderReference.stripePaymentIntentId ?? syncedOrder.stripePaymentIntentId,
+    occurredAt: normalized.occurredAt,
   });
 
   return {
+    eventType: normalized.eventType,
     ...result,
     handled: true,
   };
-}
-
-async function handlePaymentIntentWebhookEvent(
-  paymentIntent: Stripe.PaymentIntent,
-  status: OrderTransitionStatus,
-  occurredAt?: string,
-) {
-  const order = await getTicketOrderByWebhookReference({
-    orderId: getStripePaymentIntentOrderId(paymentIntent),
-    stripePaymentIntentId: paymentIntent.id,
-  });
-
-  if (!order) {
-    throw notFound("Ticket order not found");
-  }
-
-  const result = await handleStripeWebhookService({
-    orderId: order.id,
-    status,
-    stripeConnectedAccountId: order.stripeConnectedAccountId,
-    stripeCheckoutSessionId: order.stripeCheckoutSessionId,
-    stripePaymentIntentId: paymentIntent.id,
-    occurredAt,
-  });
-
-  return {
-    ...result,
-    handled: true,
-  };
-}
-
-export async function handleStripeEventService(event: Stripe.Event) {
-  const occurredAt = new Date(event.created * 1000).toISOString();
-
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const nextStatus =
-        session.payment_status === "paid" || session.payment_status === "no_payment_required"
-          ? "paid"
-          : undefined;
-
-      return {
-        eventType: event.type,
-        ...(await handleCheckoutSessionWebhookEvent(session, nextStatus, occurredAt)),
-      };
-    }
-    case "checkout.session.async_payment_succeeded": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      return {
-        eventType: event.type,
-        ...(await handleCheckoutSessionWebhookEvent(session, "paid", occurredAt)),
-      };
-    }
-    case "checkout.session.async_payment_failed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      return {
-        eventType: event.type,
-        ...(await handleCheckoutSessionWebhookEvent(session, "payment_failed", occurredAt)),
-      };
-    }
-    case "checkout.session.expired": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      return {
-        eventType: event.type,
-        ...(await handleCheckoutSessionWebhookEvent(session, "expired", occurredAt)),
-      };
-    }
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      return {
-        eventType: event.type,
-        ...(await handlePaymentIntentWebhookEvent(paymentIntent, "paid", occurredAt)),
-      };
-    }
-    case "payment_intent.payment_failed": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      return {
-        eventType: event.type,
-        ...(await handlePaymentIntentWebhookEvent(paymentIntent, "payment_failed", occurredAt)),
-      };
-    }
-    case "payment_intent.canceled": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      return {
-        eventType: event.type,
-        ...(await handlePaymentIntentWebhookEvent(paymentIntent, "cancelled", occurredAt)),
-      };
-    }
-    default:
-      return {
-        eventType: event.type,
-        handled: false,
-      };
-  }
 }
 
 export async function verifyAndHandleStripeWebhookEventService(
   payload: string,
   signature: string,
 ) {
-  const stripe = getStripeServerClient();
-  const config = getStripeConfig();
-  const event = stripe.webhooks.constructEvent(
-    payload,
-    signature,
-    config.STRIPE_WEBHOOK_SECRET,
-  );
+  const event = verifyStripeWebhookEvent(payload, signature);
 
   const result = await handleStripeEventService(event);
 

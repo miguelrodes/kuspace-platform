@@ -5,11 +5,13 @@ import {
   type CreateTicketOrderInput,
   type UpdateTicketOrderStatusInput,
 } from "@/lib/validation/order";
+import type { TicketOrder } from "@/types/order";
 import {
   createTicketOrderRepository,
   getTicketOrderRepositoryById,
   getTicketOrderRepositoryByStripeCheckoutSessionId,
   getTicketOrderRepositoryByStripePaymentIntentId,
+  listTicketOrdersRepositoryByEventId,
   updateTicketOrderRepository,
 } from "@/lib/db/repositories/order-repository";
 
@@ -51,6 +53,21 @@ export async function getTicketOrderByStripeCheckoutSessionService(stripeCheckou
 
 export async function getTicketOrderByStripePaymentIntentService(stripePaymentIntentId: string) {
   return getTicketOrderRepositoryByStripePaymentIntentId(stripePaymentIntentId);
+}
+
+export async function listTicketOrdersByEventService(
+  eventId: string,
+  options?: {
+    status?: TicketOrder["status"];
+  },
+) {
+  return listTicketOrdersRepositoryByEventId(eventId, options);
+}
+
+export async function listPaidTicketOrdersByEventService(eventId: string) {
+  return listTicketOrdersRepositoryByEventId(eventId, {
+    status: "paid",
+  });
 }
 
 export async function updateTicketOrderStatusService(input: UpdateTicketOrderStatusInput) {

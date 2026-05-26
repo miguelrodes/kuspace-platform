@@ -1056,7 +1056,9 @@ export function EventEditorShell(props: EventEditorShellProps) {
 
   return (
     <div className="-mt-6 space-y-2">
-      <EventEditorHeader />
+      <EventEditorHeader
+        attendeesHref={props.mode === "edit" ? `/office/events/${props.eventId}/attendees` : undefined}
+      />
 
       <div className="pt-3">
         <div className="flex flex-wrap items-center gap-4">
