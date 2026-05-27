@@ -8,6 +8,7 @@ import {
 import type { TicketOrder } from "@/types/order";
 import {
   createTicketOrderRepository,
+  fulfillPaidTicketOrderRepository,
   getTicketOrderRepositoryById,
   getTicketOrderRepositoryByStripeCheckoutSessionId,
   getTicketOrderRepositoryByStripePaymentIntentId,
@@ -84,4 +85,14 @@ export async function updateTicketOrderStatusService(input: UpdateTicketOrderSta
     stripeCheckoutSessionId: payload.stripeCheckoutSessionId,
     stripePaymentIntentId: payload.stripePaymentIntentId,
   });
+}
+
+export async function fulfillPaidTicketOrderService(input: {
+  orderId: string;
+  occurredAt: string;
+  stripeConnectedAccountId?: string;
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
+}) {
+  return fulfillPaidTicketOrderRepository(input);
 }

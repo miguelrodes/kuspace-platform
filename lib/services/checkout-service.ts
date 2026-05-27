@@ -1,16 +1,14 @@
 import { badRequest, conflict, forbidden, notFound } from "@/lib/http/errors";
 import type Stripe from "stripe";
 import {
-  getConsumerWalletStatusForPaymentState,
   getVisibleTicketSectionsForUser,
-  syncTicketPurchaseToEvent,
-  syncTicketPurchaseToUser,
 } from "@/lib/event-access";
-import { getConsumerRepositoryById, saveConsumerRepository } from "@/lib/db/repositories/consumer-repository";
+import { getConsumerRepositoryById } from "@/lib/db/repositories/consumer-repository";
 import { getOrganizationRepositoryById } from "@/lib/db/repositories/organization-repository";
-import { getEventTicketRepositoryByEventId, saveEventTicketRepository } from "@/lib/db/repositories/ticket-repository";
+import { getEventTicketRepositoryByEventId } from "@/lib/db/repositories/ticket-repository";
 import {
   createPendingTicketOrderService,
+  fulfillPaidTicketOrderService,
   getTicketOrderByStripeCheckoutSessionService,
   getTicketOrderByStripePaymentIntentService,
   getTicketOrderService,
@@ -33,8 +31,7 @@ import {
   type StripeTicketOrderReference,
 } from "@/lib/stripe/stripe-service";
 import type { Event } from "@/types/event";
-import type { TicketOrder } from "@/types/order";
-import type { ConsumerUser } from "@/types/user";
+import type { TicketOrder, TicketOrderStatus } from "@/types/order";
 import type { WorkspaceOrganization } from "@/types/workspace";
 import type {
   TicketCheckoutIntentResult,
@@ -42,7 +39,7 @@ import type {
   TicketOrderPaymentTransitionResult,
   CheckoutProvider,
 } from "@/types/checkout";
-type OrderTransitionStatus = "paid" | "payment_failed" | "cancelled" | "expired";
+type OrderTransitionStatus = Exclude<TicketOrderStatus, "pending" | "checkout_started">;
 
 type ResolvedCheckoutContext = {
   event: NonNullable<Awaited<ReturnType<typeof getEventTicketRepositoryByEventId>>>;
@@ -60,9 +57,23 @@ function getRemainingPhaseInventory(phase: { quantityAvailable: number; quantity
   return phase.quantityAvailable - (phase.quantitySold ?? 0);
 }
 
+function isPurchasablePhase(phase: {
+  visibility: "public" | "hidden";
+  status: "live" | "upcoming" | "sold_out";
+  quantityAvailable: number;
+  quantitySold?: number;
+}) {
+  return (
+    phase.visibility === "public" &&
+    phase.status === "live" &&
+    getRemainingPhaseInventory(phase) > 0
+  );
+}
+
 function getPurchasableSectionPhase(
   event: NonNullable<Awaited<ReturnType<typeof getEventTicketRepositoryByEventId>>>,
   sectionId: string,
+  phaseId: string | undefined,
   quantity: number,
 ) {
   const section = (event.tickets.sections ?? []).find((candidate) => candidate.id === sectionId);
@@ -71,13 +82,26 @@ function getPurchasableSectionPhase(
     throw notFound("Ticket section not found");
   }
 
-  const phase = section.phases
-    .filter((candidate) => candidate.visibility === "public" && candidate.status !== "sold_out")
-    .filter((candidate) => getRemainingPhaseInventory(candidate) > 0)
-    .sort((left, right) => left.sortOrder - right.sortOrder)[0];
+  const phase = phaseId
+    ? section.phases.find((candidate) => candidate.id === phaseId)
+    : section.phases
+        .filter((candidate) => isPurchasablePhase(candidate))
+        .sort((left, right) => left.sortOrder - right.sortOrder)[0];
 
   if (!phase) {
+    if (phaseId) {
+      throw notFound("Ticket phase not found");
+    }
+
     throw forbidden("This ticket section does not currently have any purchasable phases.");
+  }
+
+  if (phase.visibility !== "public") {
+    throw forbidden("This ticket phase is not currently visible.");
+  }
+
+  if (phase.status !== "live") {
+    throw forbidden("This ticket phase is not currently live.");
   }
 
   if (getRemainingPhaseInventory(phase) < quantity) {
@@ -116,6 +140,7 @@ async function resolveCheckoutContext(params: {
   eventId: string;
   userId: string;
   sectionId: string;
+  phaseId?: string;
   quantity?: number;
   provider?: CheckoutProvider;
 }) {
@@ -146,7 +171,12 @@ async function resolveCheckoutContext(params: {
   }
 
   const quantity = nextParams.quantity ?? 1;
-  const { section, phase } = getPurchasableSectionPhase(event, nextParams.sectionId, quantity);
+  const { section, phase } = getPurchasableSectionPhase(
+    event,
+    nextParams.sectionId,
+    nextParams.phaseId,
+    quantity,
+  );
   const visibleSections = getVisibleTicketSectionsForUser(event, nextParams.userId);
 
   if (!visibleSections.some((candidate) => candidate.id === section.id)) {
@@ -289,10 +319,6 @@ async function createStripeCheckoutSessionForOrder(
   });
 }
 
-function getOrderPaymentState(order: TicketOrder) {
-  return order.totalAmount > 0 ? "paid" : "not_required";
-}
-
 function getOrderItemSection(
   event: Event,
   item: TicketOrder["items"][number],
@@ -312,68 +338,6 @@ function getOrderItemSection(
   return {
     section,
     phase,
-  };
-}
-
-async function fulfillTicketOrder(
-  order: TicketOrder,
-  occurredAt: string,
-): Promise<{ event: Event; user: ConsumerUser }> {
-  const [event, user] = await Promise.all([
-    getEventTicketRepositoryByEventId(order.eventId),
-    getConsumerRepositoryById(order.consumerUserId),
-  ]);
-
-  if (!event) {
-    throw notFound("Event not found");
-  }
-
-  if (!user) {
-    throw notFound("Consumer user not found");
-  }
-
-  const paymentState = getOrderPaymentState(order);
-  let nextEvent = event;
-  let nextUser = user;
-
-  for (const item of order.items) {
-    const { section, phase } = getOrderItemSection(nextEvent, item);
-
-    nextEvent = syncTicketPurchaseToEvent(nextEvent, {
-      userId: order.consumerUserId,
-      accessGroupId: section.accessGroupId,
-      ticketPhaseId: phase.id,
-      quantity: item.quantity,
-      purchasedAt: occurredAt,
-      paymentState,
-      source: "purchase",
-    });
-
-    nextUser = syncTicketPurchaseToUser(nextUser, {
-      eventSlug: nextEvent.slug,
-      quantity: item.quantity,
-      accessGroupId: section.accessGroupId,
-      ticketLabel: section.name,
-      status: getConsumerWalletStatusForPaymentState(paymentState),
-    });
-  }
-
-  const [savedEvent, savedUser] = await Promise.all([
-    saveEventTicketRepository(nextEvent),
-    saveConsumerRepository(nextUser),
-  ]);
-
-  if (!savedEvent) {
-    throw notFound("Event not found");
-  }
-
-  if (!savedUser) {
-    throw notFound("Consumer user not found");
-  }
-
-  return {
-    event: savedEvent,
-    user: savedUser,
   };
 }
 
@@ -489,6 +453,7 @@ export async function createCheckoutIntentService(params: {
   eventId: string;
   userId: string;
   sectionId: string;
+  phaseId?: string;
   quantity?: number;
   provider?: CheckoutProvider;
 }) {
@@ -656,9 +621,28 @@ export async function applyCheckoutIntentPaymentTransitionService(params: {
     };
   }
 
-  const updatedOrder = await updateTicketOrderStatusService({
+  if (nextParams.status !== "paid") {
+    const updatedOrder = await updateTicketOrderStatusService({
+      orderId: existingOrder.id,
+      status: nextParams.status,
+      stripeConnectedAccountId:
+        nextParams.stripeConnectedAccountId ?? existingOrder.stripeConnectedAccountId,
+      stripeCheckoutSessionId:
+        nextParams.stripeCheckoutSessionId ?? existingOrder.stripeCheckoutSessionId,
+      stripePaymentIntentId:
+        nextParams.stripePaymentIntentId ?? existingOrder.stripePaymentIntentId,
+    });
+
+    return {
+      order: updatedOrder,
+      fulfilled: false,
+    };
+  }
+
+  const occurredAt = nextParams.occurredAt || new Date().toISOString();
+  const fulfilledPurchase = await fulfillPaidTicketOrderService({
     orderId: existingOrder.id,
-    status: nextParams.status,
+    occurredAt,
     stripeConnectedAccountId:
       nextParams.stripeConnectedAccountId ?? existingOrder.stripeConnectedAccountId,
     stripeCheckoutSessionId:
@@ -667,18 +651,15 @@ export async function applyCheckoutIntentPaymentTransitionService(params: {
       nextParams.stripePaymentIntentId ?? existingOrder.stripePaymentIntentId,
   });
 
-  if (nextParams.status !== "paid") {
+  if (!fulfilledPurchase.fulfilled) {
     return {
-      order: updatedOrder,
+      order: fulfilledPurchase.order,
       fulfilled: false,
     };
   }
 
-  const occurredAt = nextParams.occurredAt || new Date().toISOString();
-  const fulfilledPurchase = await fulfillTicketOrder(updatedOrder, occurredAt);
-
   return {
-    order: updatedOrder,
+    order: fulfilledPurchase.order,
     fulfilled: true,
     event: fulfilledPurchase.event,
     user: fulfilledPurchase.user,

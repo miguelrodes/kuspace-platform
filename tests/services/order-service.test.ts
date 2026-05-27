@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createTicketOrderRepository: vi.fn(),
+  fulfillPaidTicketOrderRepository: vi.fn(),
   getTicketOrderRepositoryById: vi.fn(),
   getTicketOrderRepositoryByStripeCheckoutSessionId: vi.fn(),
   getTicketOrderRepositoryByStripePaymentIntentId: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/db/repositories/order-repository", () => ({
   createTicketOrderRepository: mocks.createTicketOrderRepository,
+  fulfillPaidTicketOrderRepository: mocks.fulfillPaidTicketOrderRepository,
   getTicketOrderRepositoryById: mocks.getTicketOrderRepositoryById,
   getTicketOrderRepositoryByStripeCheckoutSessionId: mocks.getTicketOrderRepositoryByStripeCheckoutSessionId,
   getTicketOrderRepositoryByStripePaymentIntentId: mocks.getTicketOrderRepositoryByStripePaymentIntentId,
@@ -18,6 +20,7 @@ vi.mock("@/lib/db/repositories/order-repository", () => ({
 
 import {
   createPendingTicketOrderService,
+  fulfillPaidTicketOrderService,
   getTicketOrderByStripeCheckoutSessionService,
   getTicketOrderByStripePaymentIntentService,
   getTicketOrderService,
@@ -49,6 +52,27 @@ describe("order service", () => {
       createdAt: "2026-04-25T00:00:00.000Z",
       updatedAt: "2026-04-25T00:00:00.000Z",
       items: [],
+    });
+    mocks.fulfillPaidTicketOrderRepository.mockResolvedValue({
+      order: {
+        id: "order-1",
+        eventId: "event-1",
+        organizationId: "organization-1",
+        consumerUserId: "consumer-1",
+        status: "paid",
+        currency: "EUR",
+        subtotalAmount: 90,
+        totalAmount: 90,
+        stripeConnectedAccountId: "acct_123",
+        stripeCheckoutSessionId: "cs_test_123",
+        stripePaymentIntentId: "pi_test_123",
+        createdAt: "2026-04-25T00:00:00.000Z",
+        updatedAt: "2026-04-25T00:00:00.000Z",
+        items: [],
+      },
+      fulfilled: true,
+      event: { id: "event-1" },
+      user: { id: "consumer-1" },
     });
     mocks.updateTicketOrderRepository.mockImplementation(async (_id, update) => ({
       id: "order-1",
@@ -160,6 +184,30 @@ describe("order service", () => {
     ).rejects.toMatchObject({
       status: 404,
       code: "NOT_FOUND",
+    });
+  });
+
+  it("delegates paid fulfillment to the transactional order repository helper", async () => {
+    const result = await fulfillPaidTicketOrderService({
+      orderId: "order-1",
+      occurredAt: "2026-04-26T00:00:00.000Z",
+      stripeConnectedAccountId: "acct_123",
+      stripeCheckoutSessionId: "cs_test_123",
+      stripePaymentIntentId: "pi_test_123",
+    });
+
+    expect(mocks.fulfillPaidTicketOrderRepository).toHaveBeenCalledWith({
+      orderId: "order-1",
+      occurredAt: "2026-04-26T00:00:00.000Z",
+      stripeConnectedAccountId: "acct_123",
+      stripeCheckoutSessionId: "cs_test_123",
+      stripePaymentIntentId: "pi_test_123",
+    });
+    expect(result).toMatchObject({
+      fulfilled: true,
+      order: {
+        status: "paid",
+      },
     });
   });
 });

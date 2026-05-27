@@ -552,11 +552,13 @@ async function purchaseTicketSection({
   eventId,
   userId,
   sectionId,
+  phaseId,
   quantity = 1,
 }: {
   eventId: string;
   userId: string;
   sectionId: string;
+  phaseId: string;
   quantity?: number;
 }) {
   const event = getEventById(eventId);
@@ -571,11 +573,9 @@ async function purchaseTicketSection({
     return null;
   }
 
-  const phase = section.phases
-    .filter((candidate) => candidate.visibility === "public" && candidate.status !== "sold_out")
-    .sort((left, right) => left.sortOrder - right.sortOrder)[0];
+  const phase = section.phases.find((candidate) => candidate.id === phaseId);
 
-  if (!phase) {
+  if (!phase || phase.visibility !== "public" || phase.status !== "live") {
     return null;
   }
 
@@ -586,7 +586,7 @@ async function purchaseTicketSection({
           `/api/store/events/${eventId}/purchase`,
           {
             method: "POST",
-            body: JSON.stringify({ userId, sectionId, quantity }),
+            body: JSON.stringify({ userId, sectionId, phaseId, quantity }),
           },
         ),
       reconcile: (state, result) => {
@@ -640,7 +640,7 @@ async function purchaseTicketSection({
     request: () =>
       fetchJson<TicketCheckoutIntentResult | TicketOrderPaymentTransitionResult>(`/api/store/events/${eventId}/purchase`, {
         method: "POST",
-        body: JSON.stringify({ userId, sectionId, quantity }),
+        body: JSON.stringify({ userId, sectionId, phaseId, quantity }),
       }),
     reconcile: (state, result) => {
       if (!result.fulfilled || !result.event || !result.user) {

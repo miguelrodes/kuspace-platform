@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getConsumerWalletStatusForPaymentState,
+  syncTicketPurchaseToEvent,
+  syncTicketPurchaseToUser,
+} from "@/lib/event-access";
+import { conflict, notFound } from "@/lib/http/errors";
 import { buildConsumerUser, buildLivePublicEvent } from "@/tests/helpers/fixtures";
 import type { Event } from "@/types/event";
 import type { TicketOrder } from "@/types/order";
@@ -18,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   saveEventTicketRepository: vi.fn(),
   getOrganizationRepositoryById: vi.fn(),
   createTicketOrderRepository: vi.fn(),
+  fulfillPaidTicketOrderRepository: vi.fn(),
   getTicketOrderRepositoryById: vi.fn(),
   getTicketOrderRepositoryByStripeCheckoutSessionId: vi.fn(),
   getTicketOrderRepositoryByStripePaymentIntentId: vi.fn(),
@@ -56,6 +63,7 @@ vi.mock("@/lib/db/repositories/organization-repository", () => ({
 
 vi.mock("@/lib/db/repositories/order-repository", () => ({
   createTicketOrderRepository: mocks.createTicketOrderRepository,
+  fulfillPaidTicketOrderRepository: mocks.fulfillPaidTicketOrderRepository,
   getTicketOrderRepositoryById: mocks.getTicketOrderRepositoryById,
   getTicketOrderRepositoryByStripeCheckoutSessionId: mocks.getTicketOrderRepositoryByStripeCheckoutSessionId,
   getTicketOrderRepositoryByStripePaymentIntentId: mocks.getTicketOrderRepositoryByStripePaymentIntentId,
@@ -245,6 +253,109 @@ describe("ticket purchase assignment creation", () => {
       orderStore.set(id, nextOrder);
       return nextOrder;
     });
+    mocks.fulfillPaidTicketOrderRepository.mockImplementation(async (params: {
+      orderId: string;
+      occurredAt: string;
+      stripeConnectedAccountId?: string;
+      stripeCheckoutSessionId?: string;
+      stripePaymentIntentId?: string;
+    }) => {
+      const existingOrder = orderStore.get(params.orderId);
+
+      if (!existingOrder) {
+        throw notFound("Ticket order not found");
+      }
+
+      if (existingOrder.status === "paid") {
+        return {
+          order: existingOrder,
+          fulfilled: false,
+        };
+      }
+
+      if (existingOrder.status !== "pending" && existingOrder.status !== "checkout_started") {
+        throw conflict("Ticket order cannot transition to paid from its current state.");
+      }
+
+      const nextOrder: TicketOrder = {
+        ...existingOrder,
+        status: "paid",
+        stripeConnectedAccountId:
+          params.stripeConnectedAccountId ?? existingOrder.stripeConnectedAccountId,
+        stripeCheckoutSessionId:
+          params.stripeCheckoutSessionId ?? existingOrder.stripeCheckoutSessionId,
+        stripePaymentIntentId:
+          params.stripePaymentIntentId ?? existingOrder.stripePaymentIntentId,
+        updatedAt: params.occurredAt,
+      };
+      const paymentState = nextOrder.totalAmount > 0 ? "paid" : "not_required";
+      let nextEvent = currentEvent;
+      let nextUser = currentUser;
+
+      for (const item of nextOrder.items) {
+        const section = (nextEvent.tickets.sections ?? []).find(
+          (candidate) => candidate.id === item.ticketSectionId,
+        );
+
+        if (!section) {
+          throw notFound("Ticket section not found for order item.");
+        }
+
+        const phase = section.phases.find((candidate) => candidate.id === item.ticketPhaseId);
+
+        if (!phase) {
+          throw notFound("Ticket phase not found for order item.");
+        }
+
+        if ((phase.quantitySold ?? 0) + item.quantity > phase.quantityAvailable) {
+          throw conflict("Confirmed payment would exceed the available ticket inventory.");
+        }
+
+        nextEvent = syncTicketPurchaseToEvent(nextEvent, {
+          userId: nextOrder.consumerUserId,
+          accessGroupId: section.accessGroupId,
+          ticketPhaseId: phase.id,
+          quantity: item.quantity,
+          purchasedAt: params.occurredAt,
+          paymentState,
+          source: "purchase",
+        });
+
+        nextUser = syncTicketPurchaseToUser(nextUser, {
+          eventSlug: nextEvent.slug,
+          quantity: item.quantity,
+          accessGroupId: section.accessGroupId,
+          ticketLabel: section.name,
+          status: getConsumerWalletStatusForPaymentState(paymentState),
+        });
+      }
+
+      const upcomingTicketEventSlugs = new Set(nextUser.upcomingTicketEventSlugs ?? []);
+      const pastTicketEventSlugs = new Set(nextUser.pastTicketEventSlugs ?? []);
+
+      if (nextEvent.status === "past") {
+        upcomingTicketEventSlugs.delete(nextEvent.slug);
+        pastTicketEventSlugs.add(nextEvent.slug);
+      } else {
+        pastTicketEventSlugs.delete(nextEvent.slug);
+        upcomingTicketEventSlugs.add(nextEvent.slug);
+      }
+
+      currentEvent = nextEvent;
+      currentUser = {
+        ...nextUser,
+        upcomingTicketEventSlugs: Array.from(upcomingTicketEventSlugs),
+        pastTicketEventSlugs: Array.from(pastTicketEventSlugs),
+      };
+      orderStore.set(params.orderId, nextOrder);
+
+      return {
+        order: nextOrder,
+        fulfilled: true,
+        event: currentEvent,
+        user: currentUser,
+      };
+    });
   });
 
   it("creates wallet entries, quantitySold, and event access assignments for no-payment tickets", async () => {
@@ -313,6 +424,7 @@ describe("ticket purchase assignment creation", () => {
       eventId: currentEvent.id,
       userId: currentUser.id,
       sectionId: "ticket-section-regular-entry",
+      phaseId: "ticket-phase-general",
       quantity: 2,
     });
 
@@ -345,6 +457,50 @@ describe("ticket purchase assignment creation", () => {
     expect(currentEvent.accessAssignments).toHaveLength(0);
     expect(currentUser.ticketWalletEntries).toHaveLength(0);
     expect(currentEvent.tickets.sections?.[0]?.phases[0]?.quantitySold).toBe(0);
+  });
+
+  it("rejects checkout when the requested phase is not currently live", async () => {
+    currentEvent = buildLivePublicEvent({
+      tickets: {
+        tiers: [],
+        sections: [
+          {
+            id: "ticket-section-regular-entry",
+            name: "Regular Entry",
+            visibility: "public",
+            accessGroupId: "group-regular-entry",
+            allowedGroupIds: [],
+            phases: [
+              {
+                id: "ticket-phase-early-bird",
+                name: "Early Bird",
+                price: 30,
+                quantityAvailable: 50,
+                quantitySold: 0,
+                visibility: "public",
+                status: "upcoming",
+                sortOrder: 0,
+                releaseMode: "manual",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    await expect(
+      createCheckoutIntentService({
+        eventId: currentEvent.id,
+        userId: currentUser.id,
+        sectionId: "ticket-section-regular-entry",
+        phaseId: "ticket-phase-early-bird",
+        quantity: 1,
+      }),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN",
+      message: "This ticket phase is not currently live.",
+    });
   });
 
   it("sets on_behalf_of for cross-region destination charges", async () => {
@@ -618,5 +774,74 @@ describe("ticket purchase assignment creation", () => {
     expect(duplicateResult.fulfilled).toBe(false);
     expect(currentEvent.tickets.sections?.[0]?.phases[0]?.quantitySold).toBe(2);
     expect(currentUser.ticketWalletEntries?.[0]?.quantity).toBe(2);
+  });
+
+  it("rejects late webhook fulfillment that would oversell remaining inventory", async () => {
+    currentEvent = buildLivePublicEvent({
+      tickets: {
+        tiers: [],
+        sections: [
+          {
+            id: "ticket-section-regular-entry",
+            name: "Regular Entry",
+            visibility: "public",
+            accessGroupId: "group-regular-entry",
+            allowedGroupIds: [],
+            phases: [
+              {
+                id: "ticket-phase-general",
+                name: "General Admission",
+                price: 40,
+                quantityAvailable: 1,
+                quantitySold: 0,
+                visibility: "public",
+                status: "live",
+                sortOrder: 0,
+                releaseMode: "manual",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const firstCheckout = await createCheckoutIntentService({
+      eventId: currentEvent.id,
+      userId: currentUser.id,
+      sectionId: "ticket-section-regular-entry",
+      phaseId: "ticket-phase-general",
+      quantity: 1,
+    });
+    const secondCheckout = await createCheckoutIntentService({
+      eventId: currentEvent.id,
+      userId: currentUser.id,
+      sectionId: "ticket-section-regular-entry",
+      phaseId: "ticket-phase-general",
+      quantity: 1,
+    });
+
+    await handleStripeWebhookService({
+      orderId: firstCheckout.order.id,
+      status: "paid",
+      stripeCheckoutSessionId: firstCheckout.order.stripeCheckoutSessionId,
+      stripePaymentIntentId: firstCheckout.order.stripePaymentIntentId,
+      occurredAt: "2026-04-26T00:00:00.000Z",
+    });
+
+    await expect(
+      handleStripeWebhookService({
+        orderId: secondCheckout.order.id,
+        status: "paid",
+        stripeCheckoutSessionId: secondCheckout.order.stripeCheckoutSessionId,
+        stripePaymentIntentId: secondCheckout.order.stripePaymentIntentId,
+        occurredAt: "2026-04-26T00:05:00.000Z",
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "CONFLICT",
+      message: "Confirmed payment would exceed the available ticket inventory.",
+    });
+
+    expect(currentEvent.tickets.sections?.[0]?.phases[0]?.quantitySold).toBe(1);
   });
 });

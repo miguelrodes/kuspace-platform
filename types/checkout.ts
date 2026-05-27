@@ -50,6 +50,12 @@ export interface TicketCheckoutIntentResult {
   };
 }
 
+export interface StripeCheckoutRouteResult {
+  checkoutUrl: string;
+  orderId: string;
+  sessionId: string;
+}
+
 export interface TicketOrderPaymentTransitionResult {
   order: TicketOrder;
   fulfilled: boolean;

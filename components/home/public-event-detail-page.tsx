@@ -110,7 +110,7 @@ function TicketSectionBlock({
   onPurchase,
 }: {
   section: TicketSection;
-  onPurchase: (sectionId: string) => void;
+  onPurchase: (sectionId: string, phaseId: string) => void;
 }) {
   const activePhaseId = section.phases.find((phase) => phase.status === "live")?.id;
 
@@ -127,7 +127,7 @@ function TicketSectionBlock({
           const isActive = phase.id === activePhaseId;
           const isMutedPhase = phase.status !== "live";
           const showDivider = phase.id !== section.phases[section.phases.length - 1]?.id;
-          const isClickable = phase.status !== "sold_out";
+          const isClickable = phase.status === "live";
 
           return (
             <button
@@ -136,11 +136,11 @@ function TicketSectionBlock({
               disabled={!isClickable}
               onClick={() => {
                 if (isClickable) {
-                  onPurchase(section.id);
+                  onPurchase(section.id, phase.id);
                 }
               }}
               className={`block w-full px-4 py-2 text-left transition ${
-                phase.status === "sold_out" ? "cursor-default opacity-60" : "cursor-pointer"
+                !isClickable ? "cursor-default opacity-60" : "cursor-pointer"
               } ${phase.status === "upcoming" ? "opacity-90" : ""}`}
             >
               <div className="flex items-center gap-4">
@@ -163,6 +163,8 @@ function TicketSectionBlock({
 
                 {phase.status === "sold_out" ? (
                   <p className="shrink-0 text-body-sm text-muted">Sold Out</p>
+                ) : phase.status === "upcoming" ? (
+                  <p className="shrink-0 text-body-sm text-muted">Upcoming</p>
                 ) : null}
 
                 <p
@@ -675,7 +677,7 @@ export function PublicEventDetailPage({
                   <TicketSectionBlock
                     key={section.id}
                     section={section}
-                    onPurchase={(sectionId) => {
+                    onPurchase={(sectionId, phaseId) => {
                       if (audience !== "consumer" || !currentConsumer) {
                         return;
                       }
@@ -684,6 +686,7 @@ export function PublicEventDetailPage({
                         eventId: event.id,
                         userId: currentConsumer.id,
                         sectionId,
+                        phaseId,
                         quantity: 1,
                       });
                     }}

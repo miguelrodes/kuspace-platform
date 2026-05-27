@@ -17,6 +17,7 @@ export async function POST(request: Request, context: RouteContext) {
       eventId: id,
       userId: body.userId,
       sectionId: body.sectionId,
+      phaseId: body.phaseId,
       quantity: body.quantity,
     });
   });

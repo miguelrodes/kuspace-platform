@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getConsumerWalletStatusForPaymentState,
+  syncTicketPurchaseToEvent,
+  syncTicketPurchaseToUser,
+} from "@/lib/event-access";
+import { conflict, notFound } from "@/lib/http/errors";
 import { buildConsumerUser, buildLiveCuratedEvent, buildRecruiterProfile } from "@/tests/helpers/fixtures";
 import type { Event } from "@/types/event";
 import type { TicketOrder } from "@/types/order";
@@ -222,6 +228,115 @@ vi.mock("@/lib/db/repositories/order-repository", () => ({
 
     state.orders.set(orderId, storedOrder);
     return storedOrder;
+  }),
+  fulfillPaidTicketOrderRepository: vi.fn(async (params: {
+    orderId: string;
+    occurredAt: string;
+    stripeConnectedAccountId?: string;
+    stripeCheckoutSessionId?: string;
+    stripePaymentIntentId?: string;
+  }) => {
+    const existingOrder = state.orders.get(params.orderId);
+
+    if (!existingOrder) {
+      throw notFound("Ticket order not found");
+    }
+
+    if (existingOrder.status === "paid") {
+      return {
+        order: existingOrder,
+        fulfilled: false,
+      };
+    }
+
+    if (existingOrder.status !== "pending" && existingOrder.status !== "checkout_started") {
+      throw conflict("Ticket order cannot transition to paid from its current state.");
+    }
+
+    const nextOrder: TicketOrder = {
+      ...existingOrder,
+      status: "paid",
+      stripeConnectedAccountId:
+        params.stripeConnectedAccountId ?? existingOrder.stripeConnectedAccountId,
+      stripeCheckoutSessionId:
+        params.stripeCheckoutSessionId ?? existingOrder.stripeCheckoutSessionId,
+      stripePaymentIntentId:
+        params.stripePaymentIntentId ?? existingOrder.stripePaymentIntentId,
+      updatedAt: params.occurredAt,
+    };
+    const paymentState = nextOrder.totalAmount > 0 ? "paid" : "not_required";
+    const event = state.events.get(nextOrder.eventId);
+
+    if (!event) {
+      throw notFound("Event not found");
+    }
+
+    let nextEvent = event;
+    let nextUser = state.consumerUser;
+
+    for (const item of nextOrder.items) {
+      const section = (nextEvent.tickets.sections ?? []).find(
+        (candidate) => candidate.id === item.ticketSectionId,
+      );
+
+      if (!section) {
+        throw notFound("Ticket section not found for order item.");
+      }
+
+      const phase = section.phases.find((candidate) => candidate.id === item.ticketPhaseId);
+
+      if (!phase) {
+        throw notFound("Ticket phase not found for order item.");
+      }
+
+      if ((phase.quantitySold ?? 0) + item.quantity > phase.quantityAvailable) {
+        throw conflict("Confirmed payment would exceed the available ticket inventory.");
+      }
+
+      nextEvent = syncTicketPurchaseToEvent(nextEvent, {
+        userId: nextOrder.consumerUserId,
+        accessGroupId: section.accessGroupId,
+        ticketPhaseId: phase.id,
+        quantity: item.quantity,
+        purchasedAt: params.occurredAt,
+        paymentState,
+        source: "purchase",
+      });
+
+      nextUser = syncTicketPurchaseToUser(nextUser, {
+        eventSlug: nextEvent.slug,
+        quantity: item.quantity,
+        accessGroupId: section.accessGroupId,
+        ticketLabel: section.name,
+        status: getConsumerWalletStatusForPaymentState(paymentState),
+      });
+    }
+
+    const upcomingTicketEventSlugs = new Set(nextUser.upcomingTicketEventSlugs ?? []);
+    const pastTicketEventSlugs = new Set(nextUser.pastTicketEventSlugs ?? []);
+
+    if (nextEvent.status === "past") {
+      upcomingTicketEventSlugs.delete(nextEvent.slug);
+      pastTicketEventSlugs.add(nextEvent.slug);
+    } else {
+      pastTicketEventSlugs.delete(nextEvent.slug);
+      upcomingTicketEventSlugs.add(nextEvent.slug);
+    }
+
+    state.consumerUser = {
+      ...nextUser,
+      upcomingTicketEventSlugs: Array.from(upcomingTicketEventSlugs),
+      pastTicketEventSlugs: Array.from(pastTicketEventSlugs),
+    };
+    state.events.set(nextEvent.id, nextEvent);
+    state.orders.set(nextOrder.id, nextOrder);
+
+    return {
+      order: nextOrder,
+      fulfilled: true,
+      event: nextEvent,
+      user: state.consumerUser,
+    };
   }),
   getTicketOrderRepositoryById: vi.fn(async (id: string) => state.orders.get(id) ?? null),
   getTicketOrderRepositoryByStripeCheckoutSessionId: vi.fn(async (stripeCheckoutSessionId: string) =>

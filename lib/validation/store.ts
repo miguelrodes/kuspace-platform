@@ -580,6 +580,7 @@ export const guestlistEntryMutationSchema = z.object({
 export const purchaseTicketSectionSchema = z.object({
   userId: idSchema,
   sectionId: idSchema,
+  phaseId: idSchema,
   quantity: positiveIntSchema.optional(),
 });
 
@@ -587,12 +588,19 @@ export const purchaseTicketSectionServiceSchema = purchaseTicketSectionSchema.ex
   eventId: idSchema,
 });
 
-export const createCheckoutIntentSchema = purchaseTicketSectionSchema.extend({
-  provider: checkoutProviderSchema.optional(),
+export const createCheckoutIntentSchema = z.object({
+  sectionId: idSchema,
+  phaseId: idSchema,
+  quantity: positiveIntSchema.optional(),
 });
 
-export const createCheckoutIntentServiceSchema = createCheckoutIntentSchema.extend({
+export const createCheckoutIntentServiceSchema = z.object({
   eventId: idSchema,
+  userId: idSchema,
+  sectionId: idSchema,
+  phaseId: idSchema.optional(),
+  quantity: positiveIntSchema.optional(),
+  provider: checkoutProviderSchema.optional(),
 });
 
 export const checkoutIntentSchema = z.object({

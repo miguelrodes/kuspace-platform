@@ -8,6 +8,7 @@ export async function purchaseTicketSectionService(params: {
   eventId: string;
   userId: string;
   sectionId: string;
+  phaseId: string;
   quantity?: number;
 }) {
   try {
@@ -34,6 +35,7 @@ export async function purchaseTicketSectionService(params: {
         eventId: params.eventId,
         userId: params.userId,
         sectionId: params.sectionId,
+        phaseId: params.phaseId,
         quantity: params.quantity ?? 1,
         ...errorMeta(error),
       },
