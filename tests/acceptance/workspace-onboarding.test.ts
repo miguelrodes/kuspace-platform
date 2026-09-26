@@ -36,6 +36,7 @@ const repoMocks = vi.hoisted(() => ({
   createOrganizationRepository: vi.fn(),
   createOrganizationMembershipRepository: vi.fn(),
   updateOrganizationRepository: vi.fn(),
+  updateOrganizationStripeConnectRepository: vi.fn(),
   getOrganizationRepositoryById: vi.fn(),
   getOrganizationsForClerkUserRepository: vi.fn(),
   getOrganizationMembershipRepository: vi.fn(),
@@ -51,6 +52,12 @@ const repoMocks = vi.hoisted(() => ({
   getEventsRepositoryByOrganizationId: vi.fn(),
   saveEventRepositoryAggregate: vi.fn(),
   getEventRepositoryById: vi.fn(),
+}));
+
+const stripeServiceMocks = vi.hoisted(() => ({
+  createStripeConnectedAccount: vi.fn(),
+  createStripeConnectedAccountOnboardingLink: vi.fn(),
+  getStripeConnectedAccountStatus: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -97,6 +104,8 @@ vi.mock("@/lib/db/repositories/organization-repository", () => ({
     repoMocks.createOrganizationMembershipRepository(...args),
   updateOrganizationRepository: (...args: unknown[]) =>
     repoMocks.updateOrganizationRepository(...args),
+  updateOrganizationStripeConnectRepository: (...args: unknown[]) =>
+    repoMocks.updateOrganizationStripeConnectRepository(...args),
   getOrganizationRepositoryById: (...args: unknown[]) =>
     repoMocks.getOrganizationRepositoryById(...args),
   getOrganizationsForClerkUserRepository: (...args: unknown[]) =>
@@ -133,8 +142,21 @@ vi.mock("@/lib/db/repositories/event-repository", () => ({
   deleteEventRepositoryAggregate: vi.fn(),
 }));
 
+vi.mock("@/lib/stripe/stripe-service", () => ({
+  createStripeConnectedAccount: (...args: unknown[]) =>
+    stripeServiceMocks.createStripeConnectedAccount(...args),
+  createStripeConnectedAccountOnboardingLink: (...args: unknown[]) =>
+    stripeServiceMocks.createStripeConnectedAccountOnboardingLink(...args),
+  getStripeConnectedAccountStatus: (...args: unknown[]) =>
+    stripeServiceMocks.getStripeConnectedAccountStatus(...args),
+}));
+
 import { getStoreBootstrapService } from "@/lib/services/bootstrap-service";
-import { createOrganizationService } from "@/lib/services/organization-service";
+import {
+  createCurrentOrganizationStripeOnboardingLinkService,
+  createOrganizationService,
+  syncCurrentOrganizationStripeAccountStatusService,
+} from "@/lib/services/organization-service";
 import { createEventService, transitionEventStatusService } from "@/lib/services/event-service";
 import { getCurrentAppActorService, selectCurrentAppActorService } from "@/lib/services/auth-actor-service";
 
@@ -238,6 +260,11 @@ describe("workspace onboarding acceptance", () => {
       Object.assign(organization, input);
       return organization;
     });
+    repoMocks.updateOrganizationStripeConnectRepository.mockImplementation(async (organizationId: string, input: Partial<WorkspaceOrganization>) => {
+      const organization = state.organizations.find((candidate) => candidate.id === organizationId)!;
+      Object.assign(organization, input);
+      return organization;
+    });
     repoMocks.getOrganizationRepositoryById.mockImplementation(async (organizationId: string) =>
       state.organizations.find((organization) => organization.id === organizationId) ?? null,
     );
@@ -295,6 +322,25 @@ describe("workspace onboarding acceptance", () => {
     repoMocks.getEventRepositoryById.mockImplementation(async (eventId: string) =>
       state.events.get(eventId) ?? null,
     );
+    stripeServiceMocks.createStripeConnectedAccount.mockResolvedValue({
+      id: "acct_123",
+    });
+    stripeServiceMocks.createStripeConnectedAccountOnboardingLink.mockResolvedValue({
+      onboardingUrl: "https://connect.stripe.test/account-link",
+      expiresAt: "2026-08-01T00:00:00.000Z",
+      returnDestination: "http://localhost:3000/office",
+      refreshDestination: "http://localhost:3000/office",
+    });
+    stripeServiceMocks.getStripeConnectedAccountStatus.mockResolvedValue({
+      account: { id: "acct_123" },
+      status: {
+        stripeAccountId: "acct_123",
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+        stripeDetailsSubmitted: true,
+        onboardingComplete: true,
+      },
+    });
   });
 
   it("routes a new recruiter through organization creation into an org-scoped office", async () => {
@@ -331,6 +377,37 @@ describe("workspace onboarding acceptance", () => {
     expect(bootstrap?.events.map((candidate) => candidate.slug)).toEqual([
       "midnight-society-opening-2026-09-12",
     ]);
+  });
+
+  it("lets the workspace owner connect Stripe for the organization and sync readiness state", async () => {
+    await selectCurrentAppActorService("recruiter");
+    const created = await createOrganizationService({
+      name: "Midnight Society",
+      slug: "midnight-society",
+      type: "independent_organizer",
+      locationDisplayText: "Barcelona",
+    });
+    state.preferredOrganizationId = created.organization.id;
+
+    const onboarding = await createCurrentOrganizationStripeOnboardingLinkService({
+      requestUrl: "http://localhost/api/workspace/organizations/current/connect-account/onboarding",
+      country: "ES",
+    });
+
+    expect(onboarding.organization.stripeAccountId).toBe("acct_123");
+    expect(onboarding.onboardingUrl).toBe("https://connect.stripe.test/account-link");
+    expect(onboarding.stripeAccountCreated).toBe(true);
+
+    const synced = await syncCurrentOrganizationStripeAccountStatusService();
+
+    expect(synced.statusSynced).toBe(true);
+    expect(synced.onboardingComplete).toBe(true);
+    expect(synced.organization).toMatchObject({
+      stripeAccountId: "acct_123",
+      stripeChargesEnabled: true,
+      stripePayoutsEnabled: true,
+      stripeDetailsSubmitted: true,
+    });
   });
 
   it("prevents a second recruiter from mutating another workspace's event while leaving consumer login untouched", async () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { unauthorized } from "@/lib/http/errors";
+import { conflict, unauthorized } from "@/lib/http/errors";
 
 const authMocks = vi.hoisted(() => ({
   requireConsumerActor: vi.fn(),
@@ -145,6 +145,36 @@ describe("checkout-intent route contracts", () => {
       error: {
         code: "CONFLICT",
         message: "Stripe Checkout is only available for paid ticket phases.",
+      },
+    });
+  });
+
+  it("passes through organization payment-readiness conflicts with a stable error shape", async () => {
+    checkoutServiceMocks.createCheckoutIntentService.mockRejectedValue(
+      conflict("This organization cannot sell paid tickets until Stripe charges are enabled."),
+    );
+
+    const response = await checkoutIntentRoute(
+      new Request("http://localhost/api/store/events/event-1/checkout-intents", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sectionId: "ticket-section-regular-entry",
+          phaseId: "ticket-phase-general",
+          quantity: 1,
+        }),
+      }),
+      { params: Promise.resolve({ id: "event-1" }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: {
+        message: "This organization cannot sell paid tickets until Stripe charges are enabled.",
+        code: "CONFLICT",
+        status: 409,
+        details: undefined,
       },
     });
   });

@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "verify:phase4": "npm test && npm run build && npx tsc --noEmit",
     "verify:phase5": "npm test && npm run build && npx tsc --noEmit",
+    "verify:phase6": "npm test && npm run build && npx tsc --noEmit",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",

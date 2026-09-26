@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { unauthorized } from "@/lib/http/errors";
+import { badRequest, unauthorized } from "@/lib/http/errors";
 import { buildDraftEvent } from "@/tests/helpers/fixtures";
 
 const eventServiceMocks = vi.hoisted(() => ({
@@ -212,5 +212,33 @@ describe("store route contracts", () => {
       payload,
       "t=1,v1=test",
     );
+  });
+
+  it("returns 400 when webhook verification rejects the payload", async () => {
+    checkoutServiceMocks.verifyAndHandleStripeWebhookEventService.mockRejectedValue(
+      badRequest("Invalid Stripe webhook signature."),
+    );
+
+    const response = await stripeWebhookRoute(
+      new Request("http://localhost/api/store/payments/webhooks/stripe", {
+        method: "POST",
+        headers: {
+          "stripe-signature": "t=1,v1=invalid",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: "evt_bad", type: "checkout.session.completed" }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: {
+        message: "Invalid Stripe webhook signature.",
+        code: "BAD_REQUEST",
+        status: 400,
+        details: undefined,
+      },
+    });
   });
 });

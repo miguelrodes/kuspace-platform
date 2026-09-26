@@ -1,33 +1,21 @@
 import { getEventAccessAssignment } from "@/lib/event-access";
 import { getConsumersRepositoryByIds } from "@/lib/db/repositories/consumer-repository";
 import { requireOwnedRecruiterEventService } from "@/lib/services/access-service";
-import { listPaidTicketOrdersByEventService } from "@/lib/services/order-service";
+import {
+  listPaidTicketOrdersByEventService,
+  listPaidTicketSalesSummaryByEventService,
+} from "@/lib/services/order-service";
 import type { Event, TicketSection, TicketTier } from "@/types/event";
 import type { TicketOrder } from "@/types/order";
 import type { ConsumerUser } from "@/types/user";
 import type {
   EventAttendeeReport,
   EventAttendeeRow,
-  EventTicketSalesSummaryRow,
 } from "@/types/attendee";
 
 function formatAttendeeName(user: ConsumerUser) {
   const fullName = `${user.firstName} ${user.lastName}`.trim();
   return fullName || user.username;
-}
-
-function getSectionSortOrderMap(event: Event) {
-  return new Map(
-    (event.tickets.sections ?? []).map((section, index) => [section.id, index]),
-  );
-}
-
-function getPhaseSortOrderMap(event: Event) {
-  return new Map(
-    (event.tickets.sections ?? []).flatMap((section) =>
-      section.phases.map((phase) => [phase.id, phase.sortOrder] as const),
-    ),
-  );
 }
 
 function getSectionsById(event: Event) {
@@ -85,7 +73,10 @@ export async function getOwnedEventAttendeeReportService(
   eventId: string,
 ): Promise<EventAttendeeReport> {
   const { event } = await requireOwnedRecruiterEventService(eventId, "view attendee reports for");
-  const paidOrders = await listPaidTicketOrdersByEventService(event.id);
+  const [paidOrders, salesSummary] = await Promise.all([
+    listPaidTicketOrdersByEventService(event.id),
+    listPaidTicketSalesSummaryByEventService(event.id),
+  ]);
   const consumerIds = [...new Set(paidOrders.map((order) => order.consumerUserId))];
   const consumers = await getConsumersRepositoryByIds(consumerIds);
   const consumersById = new Map(consumers.map((user) => [user.id, user]));
@@ -93,9 +84,6 @@ export async function getOwnedEventAttendeeReportService(
   const phasesById = getPhasesById(event);
   const accessGroupNamesById = getAccessGroupNamesById(event);
   const assignmentsByUserId = getAssignmentsByUserId(event);
-  const sectionSortOrders = getSectionSortOrderMap(event);
-  const phaseSortOrders = getPhaseSortOrderMap(event);
-  const salesSummaryByKey = new Map<string, EventTicketSalesSummaryRow>();
 
   const attendees = paidOrders.flatMap((order) => {
     const user = consumersById.get(order.consumerUserId);
@@ -129,22 +117,6 @@ export async function getOwnedEventAttendeeReportService(
         paidAt: order.updatedAt,
       };
 
-      const salesSummaryKey = `${item.ticketSectionId}:${item.ticketPhaseId}`;
-      const existingSummary = salesSummaryByKey.get(salesSummaryKey);
-      const remainingInventory = phase
-        ? Math.max(phase.quantityAvailable - (phase.quantitySold ?? 0), 0)
-        : 0;
-
-      salesSummaryByKey.set(salesSummaryKey, {
-        ticketSectionId: item.ticketSectionId,
-        ticketSectionName: section?.name ?? "Archived section",
-        ticketPhaseId: item.ticketPhaseId,
-        ticketPhaseName: phase?.name ?? "Archived phase",
-        ticketsSold: (existingSummary?.ticketsSold ?? 0) + item.quantity,
-        remainingInventory,
-        grossRevenue: (existingSummary?.grossRevenue ?? 0) + item.totalPrice,
-      });
-
       return attendeeRow;
     });
   });
@@ -155,35 +127,7 @@ export async function getOwnedEventAttendeeReportService(
       return paidAtDiff;
     }
 
-    const sectionDiff =
-      (sectionSortOrders.get(left.ticketSectionId) ?? Number.MAX_SAFE_INTEGER) -
-      (sectionSortOrders.get(right.ticketSectionId) ?? Number.MAX_SAFE_INTEGER);
-    if (sectionDiff !== 0) {
-      return sectionDiff;
-    }
-
-    const phaseDiff =
-      (phaseSortOrders.get(left.ticketPhaseId) ?? Number.MAX_SAFE_INTEGER) -
-      (phaseSortOrders.get(right.ticketPhaseId) ?? Number.MAX_SAFE_INTEGER);
-    if (phaseDiff !== 0) {
-      return phaseDiff;
-    }
-
     return left.attendeeName.localeCompare(right.attendeeName);
-  });
-
-  const salesSummary = [...salesSummaryByKey.values()].sort((left, right) => {
-    const sectionDiff =
-      (sectionSortOrders.get(left.ticketSectionId) ?? Number.MAX_SAFE_INTEGER) -
-      (sectionSortOrders.get(right.ticketSectionId) ?? Number.MAX_SAFE_INTEGER);
-    if (sectionDiff !== 0) {
-      return sectionDiff;
-    }
-
-    return (
-      (phaseSortOrders.get(left.ticketPhaseId) ?? Number.MAX_SAFE_INTEGER) -
-      (phaseSortOrders.get(right.ticketPhaseId) ?? Number.MAX_SAFE_INTEGER)
-    );
   });
 
   const checkoutRevenueTotal = paidOrders.reduce((total, order) => total + order.totalAmount, 0);

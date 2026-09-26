@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getTicketOrderRepositoryById: vi.fn(),
   getTicketOrderRepositoryByStripeCheckoutSessionId: vi.fn(),
   getTicketOrderRepositoryByStripePaymentIntentId: vi.fn(),
+  listPaidTicketSalesSummaryRepositoryByEventId: vi.fn(),
   updateTicketOrderRepository: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@/lib/db/repositories/order-repository", () => ({
   getTicketOrderRepositoryById: mocks.getTicketOrderRepositoryById,
   getTicketOrderRepositoryByStripeCheckoutSessionId: mocks.getTicketOrderRepositoryByStripeCheckoutSessionId,
   getTicketOrderRepositoryByStripePaymentIntentId: mocks.getTicketOrderRepositoryByStripePaymentIntentId,
+  listPaidTicketSalesSummaryRepositoryByEventId: mocks.listPaidTicketSalesSummaryRepositoryByEventId,
   updateTicketOrderRepository: mocks.updateTicketOrderRepository,
 }));
 
@@ -24,6 +26,7 @@ import {
   getTicketOrderByStripeCheckoutSessionService,
   getTicketOrderByStripePaymentIntentService,
   getTicketOrderService,
+  listPaidTicketSalesSummaryByEventService,
   updateTicketOrderStatusService,
 } from "@/lib/services/order-service";
 
@@ -74,6 +77,17 @@ describe("order service", () => {
       event: { id: "event-1" },
       user: { id: "consumer-1" },
     });
+    mocks.listPaidTicketSalesSummaryRepositoryByEventId.mockResolvedValue([
+      {
+        ticketSectionId: "section-1",
+        ticketSectionName: "Regular Entry",
+        ticketPhaseId: "phase-1",
+        ticketPhaseName: "General Admission",
+        ticketsSold: 2,
+        remainingInventory: 98,
+        grossRevenue: 90,
+      },
+    ]);
     mocks.updateTicketOrderRepository.mockImplementation(async (_id, update) => ({
       id: "order-1",
       eventId: "event-1",
@@ -170,6 +184,23 @@ describe("order service", () => {
       stripePaymentIntentId: undefined,
     });
     expect(result.status).toBe("checkout_started");
+  });
+
+  it("can list paid ticket sales summary rows by event", async () => {
+    const result = await listPaidTicketSalesSummaryByEventService("event-1");
+
+    expect(mocks.listPaidTicketSalesSummaryRepositoryByEventId).toHaveBeenCalledWith("event-1");
+    expect(result).toEqual([
+      {
+        ticketSectionId: "section-1",
+        ticketSectionName: "Regular Entry",
+        ticketPhaseId: "phase-1",
+        ticketPhaseName: "General Admission",
+        ticketsSold: 2,
+        remainingInventory: 98,
+        grossRevenue: 90,
+      },
+    ]);
   });
 
   it("returns not found when updating an order that does not exist", async () => {

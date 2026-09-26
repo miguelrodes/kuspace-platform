@@ -6,6 +6,7 @@ import type { TicketOrder } from "@/types/order";
 const mocks = vi.hoisted(() => ({
   requireOwnedRecruiterEventService: vi.fn(),
   listPaidTicketOrdersByEventService: vi.fn(),
+  listPaidTicketSalesSummaryByEventService: vi.fn(),
   getConsumersRepositoryByIds: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@/lib/services/access-service", () => ({
 
 vi.mock("@/lib/services/order-service", () => ({
   listPaidTicketOrdersByEventService: mocks.listPaidTicketOrdersByEventService,
+  listPaidTicketSalesSummaryByEventService: mocks.listPaidTicketSalesSummaryByEventService,
 }));
 
 vi.mock("@/lib/db/repositories/consumer-repository", () => ({
@@ -111,6 +113,17 @@ describe("attendee service", () => {
       event: currentEvent,
     });
     mocks.listPaidTicketOrdersByEventService.mockResolvedValue(currentOrders);
+    mocks.listPaidTicketSalesSummaryByEventService.mockResolvedValue([
+      {
+        ticketSectionId: "ticket-section-regular-entry",
+        ticketSectionName: "Regular Entry",
+        ticketPhaseId: "ticket-phase-general",
+        ticketPhaseName: "General Admission",
+        ticketsSold: 2,
+        remainingInventory: 98,
+        grossRevenue: 80,
+      },
+    ]);
     mocks.getConsumersRepositoryByIds.mockResolvedValue([
       buildConsumerUser(),
     ]);
@@ -124,6 +137,7 @@ describe("attendee service", () => {
       "view attendee reports for",
     );
     expect(mocks.listPaidTicketOrdersByEventService).toHaveBeenCalledWith(currentEvent.id);
+    expect(mocks.listPaidTicketSalesSummaryByEventService).toHaveBeenCalledWith(currentEvent.id);
     expect(mocks.getConsumersRepositoryByIds).toHaveBeenCalledWith(["consumer-luca-dea"]);
 
     expect(report.event).toMatchObject({

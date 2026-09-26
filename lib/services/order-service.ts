@@ -12,6 +12,7 @@ import {
   getTicketOrderRepositoryById,
   getTicketOrderRepositoryByStripeCheckoutSessionId,
   getTicketOrderRepositoryByStripePaymentIntentId,
+  listPaidTicketSalesSummaryRepositoryByEventId,
   listTicketOrdersRepositoryByEventId,
   updateTicketOrderRepository,
 } from "@/lib/db/repositories/order-repository";
@@ -69,6 +70,10 @@ export async function listPaidTicketOrdersByEventService(eventId: string) {
   return listTicketOrdersRepositoryByEventId(eventId, {
     status: "paid",
   });
+}
+
+export async function listPaidTicketSalesSummaryByEventService(eventId: string) {
+  return listPaidTicketSalesSummaryRepositoryByEventId(eventId);
 }
 
 export async function updateTicketOrderStatusService(input: UpdateTicketOrderStatusInput) {

@@ -161,6 +161,11 @@ vi.mock("@/lib/db/repositories/ticket-repository", () => ({
 
 vi.mock("@/lib/db/repositories/consumer-repository", () => ({
   getConsumerRepositoryById: vi.fn(async (id: string) => (id === state.consumerUser.id ? state.consumerUser : null)),
+  getConsumersRepositoryByIds: vi.fn(async (ids: string[]) =>
+    ids
+      .map((id) => (id === state.consumerUser.id ? state.consumerUser : null))
+      .filter((user): user is ConsumerUser => user !== null),
+  ),
   saveConsumerRepository: vi.fn(async (user: ConsumerUser) => {
     state.consumerUser = user;
     return user;
@@ -345,6 +350,73 @@ vi.mock("@/lib/db/repositories/order-repository", () => ({
   getTicketOrderRepositoryByStripePaymentIntentId: vi.fn(async (stripePaymentIntentId: string) =>
     Array.from(state.orders.values()).find((order) => order.stripePaymentIntentId === stripePaymentIntentId) ?? null,
   ),
+  listTicketOrdersRepositoryByEventId: vi.fn(async (
+    eventId: string,
+    options?: {
+      status?: TicketOrder["status"];
+    },
+  ) =>
+    Array.from(state.orders.values())
+      .filter((order) => {
+        if (order.eventId !== eventId) {
+          return false;
+        }
+
+        if (options?.status && order.status !== options.status) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.createdAt.localeCompare(left.createdAt))),
+  listPaidTicketSalesSummaryRepositoryByEventId: vi.fn(async (eventId: string) => {
+    const event = state.events.get(eventId);
+
+    if (!event) {
+      return [];
+    }
+
+    const sectionsById = new Map((event.tickets.sections ?? []).map((section) => [section.id, section]));
+    const phasesById = new Map(
+      (event.tickets.sections ?? []).flatMap((section) =>
+        section.phases.map((phase) => [phase.id, phase] as const),
+      ),
+    );
+    const summaryByKey = new Map<string, {
+      ticketSectionId: string;
+      ticketSectionName: string;
+      ticketPhaseId: string;
+      ticketPhaseName: string;
+      ticketsSold: number;
+      remainingInventory: number;
+      grossRevenue: number;
+    }>();
+
+    for (const order of Array.from(state.orders.values()).filter(
+      (candidate) => candidate.eventId === eventId && candidate.status === "paid",
+    )) {
+      for (const item of order.items) {
+        const section = sectionsById.get(item.ticketSectionId);
+        const phase = phasesById.get(item.ticketPhaseId);
+        const key = `${item.ticketSectionId}:${item.ticketPhaseId}`;
+        const existing = summaryByKey.get(key);
+
+        summaryByKey.set(key, {
+          ticketSectionId: item.ticketSectionId,
+          ticketSectionName: section?.name ?? "Archived section",
+          ticketPhaseId: item.ticketPhaseId,
+          ticketPhaseName: phase?.name ?? "Archived phase",
+          ticketsSold: (existing?.ticketsSold ?? 0) + item.quantity,
+          remainingInventory: phase
+            ? Math.max(phase.quantityAvailable - (phase.quantitySold ?? 0), 0)
+            : 0,
+          grossRevenue: (existing?.grossRevenue ?? 0) + item.totalPrice,
+        });
+      }
+    }
+
+    return [...summaryByKey.values()];
+  }),
   updateTicketOrderRepository: vi.fn(async (id: string, update) => {
     const existing = state.orders.get(id);
 
@@ -378,6 +450,7 @@ import {
   createEventService,
   transitionEventStatusService,
 } from "@/lib/services/event-service";
+import { getOwnedEventAttendeeReportService } from "@/lib/services/attendee-service";
 import {
   updateEventCoverService,
   updateEventLineupService,
@@ -558,6 +631,7 @@ describe("backend acceptance flows", () => {
     });
     expect(checkoutIntent.fulfilled).toBe(false);
     expect(checkoutIntent.order.status).toBe("checkout_started");
+    expect(checkoutIntent.order.stripeConnectedAccountId).toBe(state.organization.stripeAccountId);
     expect(checkoutIntent.order.stripeCheckoutSessionId).toBe("cs_test_123");
     expect(checkoutIntent.checkout.stripeCheckoutUrl).toBe(
       "https://checkout.stripe.test/session/cs_test_123",
@@ -596,6 +670,69 @@ describe("backend acceptance flows", () => {
     });
     expect(duplicateWebhookResult.fulfilled).toBe(false);
     expect(state.consumerUser.ticketWalletEntries?.[0]?.quantity).toBe(1);
+
+    state.role = "recruiter";
+    const attendeeReport = await getOwnedEventAttendeeReportService(liveEvent!.id);
+
+    expect(attendeeReport.attendees).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          attendeeUsername: state.consumerUser.username,
+          ticketSectionName: "Regular Entry",
+          paymentState: "paid",
+        }),
+      ]),
+    );
+    expect(attendeeReport.summary.ticketsSold).toBe(1);
+  });
+
+  it("prevents consumers from buying restricted ticket sections they are not eligible to access", async () => {
+    const restrictedEvent = buildLiveCuratedEvent({
+      id: "event-restricted-2026-08-02",
+      slug: "restricted-2026-08-02",
+      admissionMode: "public",
+      tickets: {
+        tiers: [],
+        sections: [
+          {
+            id: "ticket-section-guestlist",
+            name: "Guestlist",
+            visibility: "restricted",
+            accessGroupId: "group-guestlist",
+            allowedGroupIds: ["group-guestlist"],
+            phases: [
+              {
+                id: "ticket-phase-guestlist",
+                name: "Guestlist Access",
+                price: 0,
+                quantityAvailable: 50,
+                quantitySold: 0,
+                visibility: "public",
+                status: "live",
+                sortOrder: 0,
+                releaseMode: "manual",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    state.events.set(restrictedEvent.id, restrictedEvent);
+
+    state.role = "consumer";
+    await expect(
+      createCheckoutIntentService({
+        eventId: restrictedEvent.id,
+        userId: state.consumerUser.id,
+        sectionId: "ticket-section-guestlist",
+        phaseId: "ticket-phase-guestlist",
+        quantity: 1,
+      }),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN",
+      message: "This ticket section is not available to the current user.",
+    });
   });
 
   it("covers curated apply, approval, and ticket status derivation from assignment state", async () => {

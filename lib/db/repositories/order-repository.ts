@@ -3,6 +3,7 @@ import { conflict, notFound } from "@/lib/http/errors";
 import { getConsumerWalletStatusForPaymentState } from "@/lib/event-access";
 import { prisma } from "@/lib/prisma";
 import { getConsumerUserById, getEventById } from "@/lib/db/store-repository";
+import type { EventTicketSalesSummaryRow } from "@/types/attendee";
 import type { Event } from "@/types/event";
 import type { TicketOrder } from "@/types/order";
 import type { ConsumerUser } from "@/types/user";
@@ -233,6 +234,65 @@ export async function listTicketOrdersRepositoryByEventId(
   });
 
   return orders.map((order) => mapTicketOrderModel(order as TicketOrderModel));
+}
+
+export async function listPaidTicketSalesSummaryRepositoryByEventId(
+  eventId: string,
+): Promise<EventTicketSalesSummaryRow[]> {
+  const items = await prisma.ticketOrderItem.findMany({
+    where: {
+      order: {
+        eventId,
+        status: "paid",
+      },
+    },
+    include: {
+      ticketSection: {
+        select: {
+          id: true,
+          name: true,
+          sortOrder: true,
+        },
+      },
+      ticketPhase: {
+        select: {
+          id: true,
+          name: true,
+          sortOrder: true,
+          quantityAvailable: true,
+          quantitySold: true,
+        },
+      },
+    },
+    orderBy: [
+      { ticketSection: { sortOrder: "asc" } },
+      { ticketPhase: { sortOrder: "asc" } },
+      { createdAt: "asc" },
+    ],
+  });
+
+  const summaryByKey = new Map<string, EventTicketSalesSummaryRow>();
+
+  for (const item of items) {
+    const summaryKey = `${item.ticketSectionId}:${item.ticketPhaseId}`;
+    const existingSummary = summaryByKey.get(summaryKey);
+
+    summaryByKey.set(summaryKey, {
+      ticketSectionId: item.ticketSectionId,
+      ticketSectionName: item.ticketSection.name,
+      ticketPhaseId: item.ticketPhaseId,
+      ticketPhaseName: item.ticketPhase.name,
+      ticketsSold: (existingSummary?.ticketsSold ?? 0) + item.quantity,
+      remainingInventory: Math.max(
+        item.ticketPhase.quantityAvailable - (item.ticketPhase.quantitySold ?? 0),
+        0,
+      ),
+      grossRevenue:
+        (existingSummary?.grossRevenue ?? 0) + item.totalPrice.toNumber(),
+    });
+  }
+
+  return [...summaryByKey.values()];
 }
 
 export async function updateTicketOrderRepository(

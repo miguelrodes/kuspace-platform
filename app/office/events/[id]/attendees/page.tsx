@@ -55,7 +55,7 @@ export default async function EventAttendeesPage({
         </Link>
       )}
     >
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <Card className="space-y-1">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Paid attendees</p>
           <p className="text-title text-fg">{report.summary.totalPaidAttendees}</p>
@@ -63,6 +63,10 @@ export default async function EventAttendeesPage({
         <Card className="space-y-1">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Tickets sold</p>
           <p className="text-title text-fg">{report.summary.ticketsSold}</p>
+        </Card>
+        <Card className="space-y-1">
+          <p className="text-body-sm uppercase tracking-widerish text-muted">Revenue estimate</p>
+          <p className="text-title text-fg">{formatCurrency(report.summary.revenueEstimate)}</p>
         </Card>
         <Card className="space-y-1">
           <p className="text-body-sm uppercase tracking-widerish text-muted">Checkout revenue</p>
