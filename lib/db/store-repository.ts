@@ -452,6 +452,8 @@ async function ensureAccessGroups(tx: Prisma.TransactionClient, event: Event) {
 }
 
 export async function clearDatabase() {
+  await prisma.ticketOrderItem.deleteMany();
+  await prisma.ticketOrder.deleteMany();
   await prisma.consumerTicketWalletEntry.deleteMany();
   await prisma.consumerUserSavedEvent.deleteMany();
   await prisma.consumerUserUpcomingTicketEvent.deleteMany();

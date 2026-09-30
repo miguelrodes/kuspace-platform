@@ -602,7 +602,7 @@ export function CoverTab({ value, errors, lineupPreview, onChange }: CoverTabPro
 
               <div className="rounded-[var(--radius-surface)] border border-dashed border-border bg-bg p-3">
                 <EventPoster
-                  imageUrl={effectiveImageUrl || "/mock/event-covers/draft-placeholder.jpg"}
+                  imageUrl={effectiveImageUrl || "/demo/event-covers/meridian-draft.svg"}
                   imageAlt={value.imageAlt || "Cover preview"}
                   aspectClassName="aspect-[2.2/1]"
                 />
@@ -622,7 +622,7 @@ export function CoverTab({ value, errors, lineupPreview, onChange }: CoverTabPro
 
               <EventCard
                 variant="large"
-                imageUrl={effectiveImageUrl || "/mock/event-covers/draft-placeholder.jpg"}
+                imageUrl={effectiveImageUrl || "/demo/event-covers/meridian-draft.svg"}
                 imageAlt={value.imageAlt || "Event card preview"}
                 date={value.date}
                 title={value.title}

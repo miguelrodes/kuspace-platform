@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dropdown-select";
 
 type HomeStatusFilter = "upcoming" | "past";
-type DateFilter = "all" | "sep-1-10" | "sep-11-20" | "sep-21-30";
+type DateFilter = "all" | "early-month" | "mid-month" | "late-month";
 
 type FilterBarProps = {
   status: HomeStatusFilter;
@@ -23,14 +23,14 @@ const statusOptions: Array<{ value: HomeStatusFilter; label: string }> = [
 
 const dateOptions: Array<{ value: DateFilter; label: string }> = [
   { value: "all", label: "All Dates" },
-  { value: "sep-1-10", label: "Sep 1-10" },
-  { value: "sep-11-20", label: "Sep 11-20" },
-  { value: "sep-21-30", label: "Sep 21-30" },
+  { value: "early-month", label: "Days 1-10" },
+  { value: "mid-month", label: "Days 11-20" },
+  { value: "late-month", label: "Days 21-31" },
 ];
 
 const uiOnlyFilters = {
   genre: ["All Genres", "House", "Techno", "Disco"],
-  location: ["All Locations", "Northport", "Barcelona", "Madrid"],
+  location: ["All Locations", "Northport", "Lumen Bay", "Greyhaven"],
   type: ["All Types", "Room", "Terrace", "Festival", "Warehouse"],
 } as const;
 

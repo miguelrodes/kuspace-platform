@@ -2,10 +2,10 @@
 
 import { HomeFeed } from "@/components/home/home-feed";
 import { RecruiterTopNav } from "@/components/layout/recruiter-top-nav";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 
 export default function RecruiterHomePage() {
-  const { events, profile } = useMockEventsStore();
+  const { events, profile } = useAppStore();
 
   return (
     <div className="min-h-screen bg-bg text-fg">

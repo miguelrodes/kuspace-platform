@@ -61,7 +61,7 @@ export function createDraftEventSeed(overrides?: Partial<Event>): Event {
         start: "",
         end: "",
       },
-      imageUrl: "/mock/event-covers/draft-placeholder.jpg",
+      imageUrl: "/demo/event-covers/meridian-draft.svg",
       imageAlt: "Draft event placeholder artwork",
       location: "",
       venue: "",

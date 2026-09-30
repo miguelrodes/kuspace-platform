@@ -8,7 +8,7 @@ import { MutationErrorBanner } from "@/components/ui/mutation-error-banner";
 import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 
 type RecruiterTopNavProps = {
   title?: string;
@@ -30,7 +30,7 @@ export function RecruiterTopNav({
     mutationError,
     clearMutationError,
     switchOrganization,
-  } = useMockEventsStore();
+  } = useAppStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(currentOrganizationId ?? "");

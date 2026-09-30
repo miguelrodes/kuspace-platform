@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const stripeEnvSchema = z.object({
+  KUSPACE_DEMO_MODE: z.enum(["true", "false"]).optional(),
   STRIPE_SECRET_KEY: z.string().trim().min(1),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().trim().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().trim().min(1),
@@ -23,14 +24,36 @@ const requiredStripeEnvVars = [
   "STRIPE_CHECKOUT_CANCEL_URL",
 ] as const;
 
-export function isStripeConfigured() {
+function isStripeLiveModeKey(value: string | undefined, prefix: "sk" | "pk") {
+  return value?.trim().startsWith(`${prefix}_live_`) ?? false;
+}
+
+export function assertStripeTestModeKeys(env: EnvLike = process.env) {
+  if (env.KUSPACE_DEMO_MODE !== "true") {
+    return;
+  }
+
+  if (
+    isStripeLiveModeKey(env.STRIPE_SECRET_KEY, "sk") ||
+    isStripeLiveModeKey(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, "pk")
+  ) {
+    throw new Error(
+      "Stripe live-mode keys are not allowed when KUSPACE_DEMO_MODE=true.",
+    );
+  }
+}
+
+export function isStripeConfigured(env: EnvLike = process.env) {
+  assertStripeTestModeKeys(env);
+
   return requiredStripeEnvVars.every((key) => {
-    const value = process.env[key];
+    const value = env[key];
     return typeof value === "string" && value.trim().length > 0;
   });
 }
 
 export function getStripeConfig(env: EnvLike = process.env): StripeConfig {
+  assertStripeTestModeKeys(env);
   const result = stripeEnvSchema.safeParse(env);
 
   if (result.success) {
@@ -43,8 +66,12 @@ export function getStripeConfig(env: EnvLike = process.env): StripeConfig {
   });
 
   if (missingKeys.length > 0) {
-    throw new Error(`Stripe configuration is incomplete. Missing: ${missingKeys.join(", ")}`);
+    throw new Error(
+      `Stripe configuration is incomplete. Missing: ${missingKeys.join(", ")}`,
+    );
   }
 
-  throw new Error(`Stripe configuration is invalid: ${result.error.issues[0]?.message ?? "unknown error"}`);
+  throw new Error(
+    `Stripe configuration is invalid: ${result.error.issues[0]?.message ?? "unknown error"}`,
+  );
 }

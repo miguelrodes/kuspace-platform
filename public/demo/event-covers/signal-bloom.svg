@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-labelledby="title desc">
+  <title id="title">Signal Bloom</title><desc id="desc">Original geometric demo artwork in coral, cream, and black.</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff5a47"/><stop offset="1" stop-color="#311414"/></linearGradient><pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse"><path d="M52 0H0V52" fill="none" stroke="#fff" stroke-opacity=".12"/></pattern></defs>
+  <rect width="1200" height="750" fill="url(#bg)"/><rect width="1200" height="750" fill="url(#grid)"/><circle cx="830" cy="330" r="220" fill="none" stroke="#ffe9d6" stroke-width="44"/><circle cx="830" cy="330" r="112" fill="#ffe9d6"/><path d="M0 610 430 120 620 750H0Z" fill="#111" fill-opacity=".76"/><text x="72" y="650" fill="#fff" font-family="sans-serif" font-size="76" font-weight="700" letter-spacing="8">SIGNAL BLOOM</text>
+</svg>

@@ -27,7 +27,7 @@ type NormalizedPhaseMetrics = {
   salesEnd?: string;
 };
 
-const PROTOTYPE_NOW = new Date("2016-09-15T09:00:00.000Z");
+const PROTOTYPE_NOW = new Date("2030-05-15T23:30:00.000Z");
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function parseNumber(value: string) {

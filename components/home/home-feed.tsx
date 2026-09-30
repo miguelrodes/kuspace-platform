@@ -24,15 +24,15 @@ function matchesDateFilter(event: Event, dateFilter: DateFilter) {
 
   const day = Number(event.cover.date.slice(-2));
 
-  if (dateFilter === "sep-1-10") {
+  if (dateFilter === "early-month") {
     return day >= 1 && day <= 10;
   }
 
-  if (dateFilter === "sep-11-20") {
+  if (dateFilter === "mid-month") {
     return day >= 11 && day <= 20;
   }
 
-  return day >= 21 && day <= 30;
+  return day >= 21 && day <= 31;
 }
 
 export function HomeFeed({

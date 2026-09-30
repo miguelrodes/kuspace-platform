@@ -8,7 +8,7 @@ import { MutationErrorBanner } from "@/components/ui/mutation-error-banner";
 import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 
 type PublicTopNavProps = {
   title?: string;
@@ -21,7 +21,7 @@ export function PublicTopNav({
 }: PublicTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { events, profile, mutationError, clearMutationError } = useMockEventsStore();
+  const { events, profile, mutationError, clearMutationError } = useAppStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const navItems = useMemo(

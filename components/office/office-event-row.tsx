@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Event } from "@/types/event";
 import { EventCard } from "@/components/events/event-card";
 import { ConfirmDialog } from "@/components/ui/action-dialog";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 
 type OfficeEventRowProps = {
   event: Event;
@@ -13,7 +13,7 @@ type OfficeEventRowProps = {
 
 export function OfficeEventRow({ event }: OfficeEventRowProps) {
   const router = useRouter();
-  const { deleteEvent } = useMockEventsStore();
+  const { deleteEvent } = useAppStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);

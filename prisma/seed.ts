@@ -1,4 +1,4 @@
-import { initialMockState } from "../lib/mock-data";
+import { initialDemoState } from "../lib/demo-data";
 import {
   clearDatabase,
   saveConsumerUser,
@@ -8,9 +8,9 @@ import {
 
 async function main() {
   await clearDatabase();
-  await saveRecruiterProfile(initialMockState.profile);
+  await saveRecruiterProfile(initialDemoState.profile);
 
-  for (const user of initialMockState.users) {
+  for (const user of initialDemoState.users) {
     await saveConsumerUser({
       ...user,
       savedEventSlugs: [],
@@ -20,18 +20,18 @@ async function main() {
     });
   }
 
-  for (const event of initialMockState.events) {
+  for (const event of initialDemoState.events) {
     await saveEventAggregate(event);
   }
 
-  for (const user of initialMockState.users) {
+  for (const user of initialDemoState.users) {
     await saveConsumerUser(user);
   }
 }
 
 main()
   .then(() => {
-    console.log("Seeded Supabase from current mock data.");
+    console.log("Seeded the database with fictional KUSPACE demo data.");
   })
   .catch((error) => {
     console.error(error);

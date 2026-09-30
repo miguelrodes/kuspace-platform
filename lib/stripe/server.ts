@@ -1,6 +1,7 @@
 import "server-only";
 
 import Stripe from "stripe";
+import { assertStripeTestModeKeys } from "@/lib/stripe/config";
 
 export const STRIPE_API_VERSION = "2026-04-22.dahlia";
 
@@ -11,10 +12,13 @@ type GlobalStripeCache = typeof globalThis & {
 };
 
 function getStripeSecretKey(env: StripeServerEnv = process.env) {
+  assertStripeTestModeKeys(env);
   const secretKey = env.STRIPE_SECRET_KEY?.trim();
 
   if (!secretKey) {
-    throw new Error("Stripe server configuration is incomplete. Missing: STRIPE_SECRET_KEY");
+    throw new Error(
+      "Stripe server configuration is incomplete. Missing: STRIPE_SECRET_KEY",
+    );
   }
 
   return secretKey;

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Event } from "@/types/event";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 import { OfficeCalendar } from "@/components/office/office-calendar";
 import { OfficeEventList } from "@/components/office/office-event-list";
 import type { OfficeListTab } from "@/components/office/office-event-tabs";
@@ -30,7 +30,7 @@ function sortEventsByTab(events: Event[], tab: OfficeListTab) {
 }
 
 export function OfficeDashboard() {
-  const { profile, events } = useMockEventsStore();
+  const { profile, events } = useAppStore();
   const [activeTab, setActiveTab] = useState<OfficeListTab>("live");
 
   const visibleEvents = useMemo(() => {

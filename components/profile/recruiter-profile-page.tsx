@@ -12,7 +12,7 @@ import { RecruiterTopNav } from "@/components/layout/recruiter-top-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getPublicEventCollection } from "@/lib/event-status";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 
 function RecruiterSettingsModal({
   onClose,
@@ -72,7 +72,7 @@ export function RecruiterProfilePageView({
   audience = "recruiter",
 }: RecruiterProfilePageViewProps) {
   const { signOut } = useClerk();
-  const { profile, updateProfile } = useMockEventsStore();
+  const { profile, updateProfile } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const hasHydrated = useSyncExternalStore(

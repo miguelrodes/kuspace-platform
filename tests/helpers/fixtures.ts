@@ -49,7 +49,7 @@ export function buildDraftEvent(overrides: Partial<Event> = {}): Event {
       genreDisplayMode: "event",
       date: "2026-08-01",
       time: { start: "22:00", end: "06:00" },
-      imageUrl: "/mock/event-covers/opening.jpg",
+      imageUrl: "/demo/event-covers/signal-bloom.svg",
       imageAlt: "Space Opening",
       location: "Northport",
       venue: "Neon Harbor",

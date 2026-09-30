@@ -528,19 +528,19 @@ describe("backend acceptance flows", () => {
   });
 
   it("covers recruiter draft creation through consumer save and purchase", async () => {
-    const draftEvent = await createEventService({ slug: "space-opening-2026-08-01" });
+    const draftEvent = await createEventService({ slug: "harbor-opening-2030-08-01" });
 
     expect(draftEvent.status).toBe("draft");
 
     await updateEventCoverService(draftEvent.id, {
       cover: {
         ...draftEvent.cover,
-        title: "Space Opening 2026",
-        date: "2026-08-01",
+        title: "Harbor Opening 2030",
+        date: "2030-08-01",
         location: "Northport",
         venue: "Neon Harbor",
-        imageUrl: "/mock/event-covers/opening.jpg",
-        imageAlt: "Space Opening 2026",
+        imageUrl: "/demo/event-covers/signal-bloom.svg",
+        imageAlt: "Original Harbor Opening artwork",
         capacityTarget: 2000,
         genres: ["House"],
         type: "room",

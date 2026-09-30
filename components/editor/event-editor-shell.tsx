@@ -6,7 +6,7 @@ import type { Event, EditorTab, EventStatus } from "@/types/event";
 import { createDraftEventSeed } from "@/lib/event-draft";
 import { resolveManualAssignmentPaymentState } from "@/lib/event-access";
 import { isLockedEventStatus } from "@/lib/event-status";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 import { EventEditorHeader } from "@/components/editor/event-editor-header";
 import { EditorTabNav } from "@/components/editor/editor-tab-nav";
 import { EditorActionBar } from "@/components/editor/editor-action-bar";
@@ -696,7 +696,7 @@ export function EventEditorShell(props: EventEditorShellProps) {
     denyCuratedApplication,
     artists,
     users,
-  } = useMockEventsStore();
+  } = useAppStore();
   const draftSeedRef = useRef<Event | null>(null);
 
   if (props.mode === "new" && !draftSeedRef.current) {

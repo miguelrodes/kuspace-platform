@@ -33,7 +33,9 @@ describe("stripe config", () => {
         ...completeEnv,
         STRIPE_WEBHOOK_SECRET: "",
       }),
-    ).toThrow("Stripe configuration is incomplete. Missing: STRIPE_WEBHOOK_SECRET");
+    ).toThrow(
+      "Stripe configuration is incomplete. Missing: STRIPE_WEBHOOK_SECRET",
+    );
   });
 
   it("throws a validation error when Stripe URLs are malformed", () => {
@@ -43,5 +45,21 @@ describe("stripe config", () => {
         STRIPE_CONNECT_RETURN_URL: "/office",
       }),
     ).toThrow("Stripe configuration is invalid:");
+  });
+
+  it("rejects live Stripe keys in public demo mode", () => {
+    const liveSecretKey = ["sk", "live", "public_demo_key"].join("_");
+    const livePublishableKey = ["pk", "live", "public_demo_key"].join("_");
+
+    expect(() =>
+      getStripeConfig({
+        ...completeEnv,
+        KUSPACE_DEMO_MODE: "true",
+        STRIPE_SECRET_KEY: liveSecretKey,
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: livePublishableKey,
+      }),
+    ).toThrow(
+      "Stripe live-mode keys are not allowed when KUSPACE_DEMO_MODE=true.",
+    );
   });
 });

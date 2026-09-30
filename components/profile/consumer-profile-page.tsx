@@ -1,7 +1,14 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { ChangeEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  ChangeEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { EventCard } from "@/components/events/event-card";
 import { EventMetaRow } from "@/components/home/event-meta-row";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
@@ -9,20 +16,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SectionNav } from "@/components/ui/section-nav";
 import { profileEventGridClassName } from "@/components/office/event-card-variants";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 
 const cityOptions = [
   "Northport",
-  "Barcelona, Spain",
-  "Madrid, Spain",
-  "Valencia, Spain",
-  "Palma, Spain",
-  "London, UK",
-  "Paris, France",
-  "Berlin, Germany",
+  "Lumen Bay",
+  "Greyhaven",
+  "Solace Point",
 ] as const;
 
 const MAX_PROFILE_GENRES = 5;
+
+function ClerkLogoutButton() {
+  const { signOut } = useClerk();
+
+  return (
+    <button
+      type="button"
+      className="text-body text-fg block transition hover:text-[var(--accent-hex)]"
+      onClick={() => {
+        void signOut({ redirectUrl: "/" });
+      }}
+    >
+      Log Out
+    </button>
+  );
+}
 
 function Avatar({
   firstName,
@@ -33,30 +52,27 @@ function Avatar({
   lastName: string;
   avatarImageUrl?: string;
 }) {
-  const normalizedAvatarImageUrl =
-    avatarImageUrl && !avatarImageUrl.startsWith("/mock/users/")
-      ? avatarImageUrl
-      : undefined;
+  const normalizedAvatarImageUrl = avatarImageUrl || undefined;
 
   if (normalizedAvatarImageUrl) {
     return (
       <img
         src={normalizedAvatarImageUrl}
         alt={`${firstName} ${lastName}`}
-        className="h-36 w-36 rounded-full border border-border object-cover"
+        className="border-border h-36 w-36 rounded-full border object-cover"
       />
     );
   }
 
   return (
-    <div className="relative h-36 w-36 overflow-hidden rounded-full border border-border bg-panel">
+    <div className="border-border bg-panel relative h-36 w-36 overflow-hidden rounded-full border">
       <span
         aria-hidden="true"
-        className="absolute left-1/2 top-[44%] h-px w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-45deg] bg-white/22"
+        className="absolute top-[44%] left-1/2 h-px w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-45deg] bg-white/22"
       />
       <span
         aria-hidden="true"
-        className="absolute left-1/2 top-[56%] h-px w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-45deg] bg-white/22"
+        className="absolute top-[56%] left-1/2 h-px w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-45deg] bg-white/22"
       />
     </div>
   );
@@ -73,7 +89,7 @@ function SettingsModal({
   onPhoneNumberChange,
   onProfileVisibilityChange,
   onNotificationsChange,
-  onSignOut,
+  clerkEnabled,
   onClose,
 }: {
   email: string;
@@ -86,31 +102,36 @@ function SettingsModal({
   onPhoneNumberChange: (nextPhoneNumber: string) => void;
   onProfileVisibilityChange: (nextVisibility: "public" | "private") => void;
   onNotificationsChange: (nextValue: boolean) => void;
-  onSignOut: () => void;
+  clerkEnabled: boolean;
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4"
+      onClick={onClose}
+    >
       <div
-        className="max-h-[82vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-surface)] border border-border bg-panel p-5 shadow-2xl"
+        className="border-border bg-panel max-h-[82vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-surface)] border p-5 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-3">
-          <h2 className="text-subheading uppercase tracking-[0.12em] text-[var(--accent-hex)]">
+          <h2 className="text-subheading tracking-[0.12em] text-[var(--accent-hex)] uppercase">
             Settings
           </h2>
         </div>
 
         <div className="mt-4 space-y-5">
-          <div className="space-y-4 border-b border-border pb-5">
-            <h3 className="text-body uppercase tracking-widerish text-fg">Personal Information</h3>
+          <div className="border-border space-y-4 border-b pb-5">
+            <h3 className="text-body tracking-widerish text-fg uppercase">
+              Personal Information
+            </h3>
 
             <div>
               <label className="text-body text-muted">Email</label>
               <Input
                 type="email"
                 value={email}
-                className="mt-1 text-body text-white/72"
+                className="text-body mt-1 text-white/72"
                 onChange={(event) => onEmailChange(event.target.value)}
               />
             </div>
@@ -120,10 +141,12 @@ function SettingsModal({
               <Input
                 type="date"
                 value={birthdate ?? ""}
-                className="mt-1 text-body text-white/72"
+                className="text-body mt-1 text-white/72"
                 onChange={(event) => onBirthdateChange(event.target.value)}
               />
-              <p className="mt-2 text-body-sm text-muted">Private field. Not shown on the main profile.</p>
+              <p className="text-body-sm text-muted mt-2">
+                Private field. Not shown on the main profile.
+              </p>
             </div>
 
             <div>
@@ -131,19 +154,21 @@ function SettingsModal({
               <Input
                 type="tel"
                 value={phoneNumber ?? ""}
-                className="mt-1 text-body text-white/72"
+                className="text-body mt-1 text-white/72"
                 onChange={(event) => onPhoneNumberChange(event.target.value)}
               />
             </div>
           </div>
 
-          <div className="space-y-4 border-b border-border pb-5">
-            <h3 className="text-body uppercase tracking-widerish text-fg">Notifications</h3>
-            <div className="flex items-center justify-between gap-4 rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <div className="border-border space-y-4 border-b pb-5">
+            <h3 className="text-body tracking-widerish text-fg uppercase">
+              Notifications
+            </h3>
+            <div className="border-border bg-panel flex items-center justify-between gap-4 rounded-[var(--radius-surface)] border px-3 py-2">
               <p className="text-body text-fg">Event and ticket updates</p>
               <button
                 type="button"
-                className={`inline-flex h-7 min-w-[5.75rem] items-center justify-center rounded-[var(--radius-surface)] border px-2 text-body-sm uppercase tracking-[0.06em] transition ${
+                className={`text-body-sm inline-flex h-7 min-w-[5.75rem] items-center justify-center rounded-[var(--radius-surface)] border px-2 tracking-[0.06em] uppercase transition ${
                   notificationsEnabled
                     ? "border-[var(--accent-hex)] text-[var(--accent-hex)]"
                     : "border-border text-muted"
@@ -155,10 +180,14 @@ function SettingsModal({
             </div>
           </div>
 
-          <div className="space-y-4 border-b border-border pb-5">
-            <h3 className="text-body uppercase tracking-widerish text-fg">Payment Methods</h3>
-            <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
-              <p className="text-body text-muted">No payment methods added yet.</p>
+          <div className="border-border space-y-4 border-b pb-5">
+            <h3 className="text-body tracking-widerish text-fg uppercase">
+              Payment Methods
+            </h3>
+            <div className="border-border bg-panel rounded-[var(--radius-surface)] border px-3 py-2">
+              <p className="text-body text-muted">
+                No payment methods added yet.
+              </p>
             </div>
             <button
               type="button"
@@ -168,9 +197,11 @@ function SettingsModal({
             </button>
           </div>
 
-          <div className="space-y-4 border-b border-border pb-5">
-            <h3 className="text-body uppercase tracking-widerish text-fg">Profile Settings</h3>
-            <div className="flex items-center justify-between gap-4 rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2">
+          <div className="border-border space-y-4 border-b pb-5">
+            <h3 className="text-body tracking-widerish text-fg uppercase">
+              Profile Settings
+            </h3>
+            <div className="border-border bg-panel flex items-center justify-between gap-4 rounded-[var(--radius-surface)] border px-3 py-2">
               <p className="text-body text-fg">Profile visibility</p>
               <div className="flex items-center gap-2">
                 {(["public", "private"] as const).map((option) => {
@@ -179,7 +210,7 @@ function SettingsModal({
                     <button
                       key={option}
                       type="button"
-                      className={`inline-flex h-7 min-w-[5.75rem] items-center justify-center rounded-[var(--radius-surface)] border px-2 text-body-sm uppercase tracking-[0.06em] transition ${
+                      className={`text-body-sm inline-flex h-7 min-w-[5.75rem] items-center justify-center rounded-[var(--radius-surface)] border px-2 tracking-[0.06em] uppercase transition ${
                         active
                           ? "border-[var(--accent-hex)] text-[var(--accent-hex)]"
                           : "border-border text-muted"
@@ -195,17 +226,22 @@ function SettingsModal({
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-body uppercase tracking-widerish text-fg">Account Actions</h3>
+            <h3 className="text-body tracking-widerish text-fg uppercase">
+              Account Actions
+            </h3>
+            {clerkEnabled ? (
+              <ClerkLogoutButton />
+            ) : (
+              <a
+                href="/"
+                className="text-body text-fg block transition hover:text-[var(--accent-hex)]"
+              >
+                Return Home
+              </a>
+            )}
             <button
               type="button"
-              className="block text-body text-fg transition hover:text-[var(--accent-hex)]"
-              onClick={onSignOut}
-            >
-              Log Out
-            </button>
-            <button
-              type="button"
-              className="block text-body text-[var(--accent-hex)] transition hover:opacity-80"
+              className="text-body block text-[var(--accent-hex)] transition hover:opacity-80"
             >
               Delete Account
             </button>
@@ -257,13 +293,13 @@ function CityCombobox({
       />
 
       {open ? (
-        <div className="absolute left-0 top-[calc(100%+0.35rem)] z-20 w-full rounded-[var(--radius-surface)] border border-border bg-panel p-1 shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
+        <div className="border-border bg-panel absolute top-[calc(100%+0.35rem)] left-0 z-20 w-full rounded-[var(--radius-surface)] border p-1 shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option) => (
               <button
                 key={option}
                 type="button"
-                className={`block w-full rounded-[var(--radius-button-tag)] px-2 py-1.5 text-left text-body transition ${
+                className={`text-body block w-full rounded-[var(--radius-button-tag)] px-2 py-1.5 text-left transition ${
                   option === value
                     ? "bg-panel-2 text-fg"
                     : "text-muted hover:bg-panel-2 hover:text-fg"
@@ -278,7 +314,9 @@ function CityCombobox({
               </button>
             ))
           ) : (
-            <p className="px-2 py-1.5 text-body-sm text-muted">No matching cities.</p>
+            <p className="text-body-sm text-muted px-2 py-1.5">
+              No matching cities.
+            </p>
           )}
         </div>
       ) : null}
@@ -291,17 +329,19 @@ function EventLibraryContent({
   recruiterName,
   recruiterSlug,
 }: {
-  events: ReturnType<typeof useMockEventsStore>["events"];
+  events: ReturnType<typeof useAppStore>["events"];
   recruiterName: string;
   recruiterSlug: string;
 }) {
   return (
     <>
       {events.length === 0 ? (
-        <p className="text-body-sm text-muted">No events in this section yet.</p>
+        <p className="text-body-sm text-muted">
+          No events in this section yet.
+        </p>
       ) : (
         <div className="max-h-[25.5rem] overflow-y-auto pr-2">
-          <div className="grid justify-start gap-y-4 xl:gap-x-3 xl:[grid-template-columns:repeat(5,13.25rem)]">
+          <div className="grid justify-start gap-y-4 xl:[grid-template-columns:repeat(5,13.25rem)] xl:gap-x-3">
             {events.map((event) => (
               <EventCard
                 key={event.id}
@@ -310,7 +350,9 @@ function EventLibraryContent({
                 imageAlt={event.cover.imageAlt}
                 date={event.cover.date}
                 title={event.cover.title}
-                lineupPreview={event.lineup.entries.map((entry) => entry.name).join(", ")}
+                lineupPreview={event.lineup.entries
+                  .map((entry) => entry.name)
+                  .join(", ")}
                 href={`/cons/events/${event.slug}`}
                 hrefMode="overlay"
                 ariaLabel={`View ${event.cover.title}`}
@@ -331,11 +373,7 @@ function EventLibraryContent({
   );
 }
 
-function ArtistsSeenContent({
-  artists,
-}: {
-  artists: string[];
-}) {
+function ArtistsSeenContent({ artists }: { artists: string[] }) {
   const [query, setQuery] = useState("");
   const filteredArtists = useMemo(() => {
     const sortedArtists = [...artists].sort((a, b) => a.localeCompare(b));
@@ -355,15 +393,17 @@ function ArtistsSeenContent({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search artists"
-        className="relative right-[2px] !h-7 w-full px-2.5 text-body-sm"
+        className="text-body-sm relative right-[2px] !h-7 w-full px-2.5"
       />
 
       {filteredArtists.length === 0 ? (
         <p className="text-body-sm text-muted">
-          {artists.length === 0 ? "No artists tracked yet." : "No artists match this search."}
+          {artists.length === 0
+            ? "No artists tracked yet."
+            : "No artists match this search."}
         </p>
       ) : (
-        <div className="max-h-[23.75rem] w-full space-y-1 overflow-y-auto text-body text-muted">
+        <div className="text-body text-muted max-h-[23.75rem] w-full space-y-1 overflow-y-auto">
           {filteredArtists.map((artist) => (
             <p key={artist} className="truncate">
               {artist}
@@ -375,10 +415,13 @@ function ArtistsSeenContent({
   );
 }
 
-export function ConsumerProfilePageView() {
-  const { signOut } = useClerk();
+export function ConsumerProfilePageView({
+  clerkEnabled = false,
+}: {
+  clerkEnabled?: boolean;
+}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { events, profile, updateUser, getCurrentConsumerUser } = useMockEventsStore();
+  const { events, profile, updateUser, getCurrentConsumerUser } = useAppStore();
   const hasHydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -387,7 +430,9 @@ export function ConsumerProfilePageView() {
   const [genreInput, setGenreInput] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [activeEventSection, setActiveEventSection] = useState<"saved" | "upcoming" | "past">("saved");
+  const [activeEventSection, setActiveEventSection] = useState<
+    "saved" | "upcoming" | "past"
+  >("saved");
   const [showGenreInput, setShowGenreInput] = useState(false);
 
   const currentUser = getCurrentConsumerUser();
@@ -403,53 +448,59 @@ export function ConsumerProfilePageView() {
     () => new Set(currentUser?.pastTicketEventSlugs ?? []),
     [currentUser?.pastTicketEventSlugs],
   );
-  const { savedEvents, upcomingEvents, pastEvents, checkedInPastEvents } = useMemo(() => {
-    const nextSavedEvents: typeof events = [];
-    const nextUpcomingEvents: typeof events = [];
-    const nextPastEvents: typeof events = [];
-    const nextCheckedInPastEvents: typeof events = [];
+  const { savedEvents, upcomingEvents, pastEvents, checkedInPastEvents } =
+    useMemo(() => {
+      const nextSavedEvents: typeof events = [];
+      const nextUpcomingEvents: typeof events = [];
+      const nextPastEvents: typeof events = [];
+      const nextCheckedInPastEvents: typeof events = [];
 
-    events.forEach((event) => {
-      if (savedEventSlugs.has(event.slug)) {
-        nextSavedEvents.push(event);
-      }
-
-      if (upcomingTicketEventSlugs.has(event.slug) && event.status !== "past") {
-        nextUpcomingEvents.push(event);
-      }
-
-      if (pastTicketEventSlugs.has(event.slug) && event.status === "past") {
-        nextPastEvents.push(event);
-
-        const checkedInByAssignment = event.accessAssignments.some(
-          (assignment) =>
-            assignment.userId === currentUser?.id && assignment.checkedIn,
-        );
-        const checkedInByGuestlist = event.guestlist.entries.some(
-          (entry) =>
-            entry.checkedIn &&
-            ("userId" in entry ? entry.userId === currentUser?.id : entry.userId === currentUser?.id),
-        );
-
-        if (checkedInByAssignment || checkedInByGuestlist) {
-          nextCheckedInPastEvents.push(event);
+      events.forEach((event) => {
+        if (savedEventSlugs.has(event.slug)) {
+          nextSavedEvents.push(event);
         }
-      }
-    });
 
-    return {
-      savedEvents: nextSavedEvents,
-      upcomingEvents: nextUpcomingEvents,
-      pastEvents: nextPastEvents,
-      checkedInPastEvents: nextCheckedInPastEvents,
-    };
-  }, [
-    currentUser?.id,
-    events,
-    pastTicketEventSlugs,
-    savedEventSlugs,
-    upcomingTicketEventSlugs,
-  ]);
+        if (
+          upcomingTicketEventSlugs.has(event.slug) &&
+          event.status !== "past"
+        ) {
+          nextUpcomingEvents.push(event);
+        }
+
+        if (pastTicketEventSlugs.has(event.slug) && event.status === "past") {
+          nextPastEvents.push(event);
+
+          const checkedInByAssignment = event.accessAssignments.some(
+            (assignment) =>
+              assignment.userId === currentUser?.id && assignment.checkedIn,
+          );
+          const checkedInByGuestlist = event.guestlist.entries.some(
+            (entry) =>
+              entry.checkedIn &&
+              ("userId" in entry
+                ? entry.userId === currentUser?.id
+                : entry.userId === currentUser?.id),
+          );
+
+          if (checkedInByAssignment || checkedInByGuestlist) {
+            nextCheckedInPastEvents.push(event);
+          }
+        }
+      });
+
+      return {
+        savedEvents: nextSavedEvents,
+        upcomingEvents: nextUpcomingEvents,
+        pastEvents: nextPastEvents,
+        checkedInPastEvents: nextCheckedInPastEvents,
+      };
+    }, [
+      currentUser?.id,
+      events,
+      pastTicketEventSlugs,
+      savedEventSlugs,
+      upcomingTicketEventSlugs,
+    ]);
   const sourceEventsForArtistsSeen =
     checkedInPastEvents.length > 0 ? checkedInPastEvents : pastEvents;
   const artistsSeen = useMemo(() => {
@@ -466,26 +517,33 @@ export function ConsumerProfilePageView() {
 
     return Array.from(deduped);
   }, [sourceEventsForArtistsSeen]);
-  const activeEvents = activeEventSection === "saved"
-    ? savedEvents
-    : activeEventSection === "upcoming"
-      ? upcomingEvents
-      : pastEvents;
+  const activeEvents =
+    activeEventSection === "saved"
+      ? savedEvents
+      : activeEventSection === "upcoming"
+        ? upcomingEvents
+        : pastEvents;
 
   if (!hasHydrated) {
     return (
-      <div className="min-h-screen bg-bg text-fg">
-        <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />
+      <div className="bg-bg text-fg min-h-screen">
+        <PublicTopNav
+          title="Nightlife Ops System"
+          subtitle="Clubs, Brands, Collectives"
+        />
       </div>
     );
   }
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-bg text-fg">
-        <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />
+      <div className="bg-bg text-fg min-h-screen">
+        <PublicTopNav
+          title="Nightlife Ops System"
+          subtitle="Clubs, Brands, Collectives"
+        />
         <main className="px-4 py-8 md:px-6">
-          <div className="mx-auto w-full max-w-none rounded-[var(--radius-surface)] border border-border bg-panel p-6">
+          <div className="border-border bg-panel mx-auto w-full max-w-none rounded-[var(--radius-surface)] border p-6">
             <p className="text-body text-muted">Profile not found.</p>
           </div>
         </main>
@@ -514,7 +572,11 @@ export function ConsumerProfilePageView() {
       return;
     }
 
-    if (favoriteGenres.some((genre) => genre.toLowerCase() === nextGenre.toLowerCase())) {
+    if (
+      favoriteGenres.some(
+        (genre) => genre.toLowerCase() === nextGenre.toLowerCase(),
+      )
+    ) {
       setGenreInput("");
       return;
     }
@@ -544,12 +606,15 @@ export function ConsumerProfilePageView() {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />
+    <div className="bg-bg text-fg min-h-screen">
+      <PublicTopNav
+        title="Nightlife Ops System"
+        subtitle="Clubs, Brands, Collectives"
+      />
 
       <main className="px-4 py-8 md:px-6">
         <div className="mx-auto w-full max-w-none space-y-2">
-          <section className="rounded-[var(--radius-surface)] border border-border bg-panel px-5 pt-5 pb-1">
+          <section className="border-border bg-panel rounded-[var(--radius-surface)] border px-5 pt-5 pb-1">
             <div className="space-y-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-6 pl-4">
@@ -560,7 +625,7 @@ export function ConsumerProfilePageView() {
                       avatarImageUrl={currentUser.avatarImageUrl}
                     />
                     {isEditing ? (
-                      <div className="flex w-36 justify-center translate-x-[4px]">
+                      <div className="flex w-36 translate-x-[4px] justify-center">
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -571,7 +636,7 @@ export function ConsumerProfilePageView() {
                         <Button
                           type="button"
                           variant="ghost"
-                          className="h-8 px-0 text-body-sm uppercase tracking-[0.12em]"
+                          className="text-body-sm h-8 px-0 tracking-[0.12em] uppercase"
                           style={{ color: "var(--accent-hex)" }}
                           onClick={() => fileInputRef.current?.click()}
                         >
@@ -584,11 +649,13 @@ export function ConsumerProfilePageView() {
                   <div className="space-y-4 pl-4">
                     {isEditing ? (
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="sm:col-span-2 max-w-sm">
-                          <label className="text-body uppercase tracking-widerish text-fg">Username</label>
+                        <div className="max-w-sm sm:col-span-2">
+                          <label className="text-body tracking-widerish text-fg uppercase">
+                            Username
+                          </label>
                           <Input
                             value={currentUser.username}
-                            className="mt-1 text-body text-white/72"
+                            className="text-body mt-1 text-white/72"
                             onChange={(event) =>
                               updateUser({
                                 id: currentUser.id,
@@ -599,10 +666,12 @@ export function ConsumerProfilePageView() {
                         </div>
 
                         <div>
-                          <label className="text-body uppercase tracking-widerish text-fg">First Name</label>
+                          <label className="text-body tracking-widerish text-fg uppercase">
+                            First Name
+                          </label>
                           <Input
                             value={currentUser.firstName}
-                            className="mt-1 text-body text-white/72"
+                            className="text-body mt-1 text-white/72"
                             onChange={(event) =>
                               updateUser({
                                 id: currentUser.id,
@@ -613,10 +682,12 @@ export function ConsumerProfilePageView() {
                         </div>
 
                         <div>
-                          <label className="text-body uppercase tracking-widerish text-fg">Last Name</label>
+                          <label className="text-body tracking-widerish text-fg uppercase">
+                            Last Name
+                          </label>
                           <Input
                             value={currentUser.lastName}
-                            className="mt-1 text-body text-white/72"
+                            className="text-body mt-1 text-white/72"
                             onChange={(event) =>
                               updateUser({
                                 id: currentUser.id,
@@ -627,7 +698,9 @@ export function ConsumerProfilePageView() {
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="text-body uppercase tracking-widerish text-fg">City</label>
+                          <label className="text-body tracking-widerish text-fg uppercase">
+                            City
+                          </label>
                           <CityCombobox
                             value={currentUser.city ?? ""}
                             onChange={(nextCity) =>
@@ -641,35 +714,41 @@ export function ConsumerProfilePageView() {
                       </div>
                     ) : (
                       <div className="space-y-1.5">
-                        <p className="text-subheading text-fg">@{currentUser.username}</p>
+                        <p className="text-subheading text-fg">
+                          @{currentUser.username}
+                        </p>
                         <div
-                          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-heading-sm text-fg"
+                          className="text-heading-sm text-fg flex flex-wrap items-center gap-x-3 gap-y-1"
                           style={{ fontFamily: "var(--font-space-grotesk)" }}
                         >
                           <p>{currentUser.firstName}</p>
                           <p>{currentUser.lastName}</p>
                         </div>
-                        <p className="text-lg text-fg">{currentUser.city}</p>
+                        <p className="text-fg text-lg">{currentUser.city}</p>
                       </div>
                     )}
 
                     <div className="space-y-1.5 pt-0">
-                      <p className="text-lg tracking-[0.04em] text-fg">Genres</p>
+                      <p className="text-fg text-lg tracking-[0.04em]">
+                        Genres
+                      </p>
 
                       <div className="flex flex-wrap items-center gap-2">
                         {favoriteGenres.map((genre) => (
                           <span
                             key={genre}
-                            className="inline-flex items-center gap-2 rounded-[var(--radius-button-tag)] border border-border bg-panel px-2.5 py-0 text-body-sm leading-none tracking-widerish text-fg"
+                            className="border-border bg-panel text-body-sm tracking-widerish text-fg inline-flex items-center gap-2 rounded-[var(--radius-button-tag)] border px-2.5 py-0 leading-none"
                           >
                             <span>{genre}</span>
                             {isEditing ? (
                               <button
                                 type="button"
-                                className="text-muted transition hover:text-fg"
+                                className="text-muted hover:text-fg transition"
                                 onClick={() =>
                                   updateGenres(
-                                    favoriteGenres.filter((currentGenre) => currentGenre !== genre),
+                                    favoriteGenres.filter(
+                                      (currentGenre) => currentGenre !== genre,
+                                    ),
                                   )
                                 }
                                 aria-label={`Remove ${genre}`}
@@ -679,11 +758,13 @@ export function ConsumerProfilePageView() {
                             ) : null}
                           </span>
                         ))}
-                        {isEditing && !showGenreInput && favoriteGenres.length < MAX_PROFILE_GENRES ? (
+                        {isEditing &&
+                        !showGenreInput &&
+                        favoriteGenres.length < MAX_PROFILE_GENRES ? (
                           <Button
                             type="button"
                             variant="ghost"
-                            className="h-7 px-0 text-body-sm uppercase tracking-[0.12em]"
+                            className="text-body-sm h-7 px-0 tracking-[0.12em] uppercase"
                             style={{ color: "var(--accent-hex)" }}
                             onClick={() => setShowGenreInput(true)}
                           >
@@ -699,7 +780,9 @@ export function ConsumerProfilePageView() {
                               value={genreInput}
                               placeholder="Add genre"
                               className="text-body text-white/72"
-                              onChange={(event) => setGenreInput(event.target.value)}
+                              onChange={(event) =>
+                                setGenreInput(event.target.value)
+                              }
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") {
                                   event.preventDefault();
@@ -707,7 +790,7 @@ export function ConsumerProfilePageView() {
                                 }
                               }}
                             />
-                            <p className="mt-2 text-body-sm text-muted">
+                            <p className="text-body-sm text-muted mt-2">
                               Up to {MAX_PROFILE_GENRES} genres.
                             </p>
                           </div>
@@ -717,11 +800,11 @@ export function ConsumerProfilePageView() {
                   </div>
                 </div>
 
-                <div className="ml-auto translate-x-3 flex items-center gap-px">
+                <div className="ml-auto flex translate-x-3 items-center gap-px">
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-8 px-0 text-body-sm uppercase tracking-[0.12em]"
+                    className="text-body-sm h-8 px-0 tracking-[0.12em] uppercase"
                     style={{ color: "var(--accent-hex)" }}
                     onClick={() => setIsEditing((current) => !current)}
                   >
@@ -730,7 +813,7 @@ export function ConsumerProfilePageView() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-8 px-0 text-body-sm uppercase tracking-[0.12em]"
+                    className="text-body-sm h-8 px-0 tracking-[0.12em] uppercase"
                     style={{ color: "var(--accent-hex)" }}
                     onClick={() => setSettingsOpen(true)}
                   >
@@ -739,46 +822,48 @@ export function ConsumerProfilePageView() {
                 </div>
               </div>
             </div>
-              <div className="pt-7">
-                <div className="grid gap-0 xl:grid-cols-[69.25rem_12rem] xl:justify-start">
-                  <div className="space-y-3 xl:pr-0">
-                    <SectionNav
-                      items={["SAVED", "UPCOMING", "PAST"]}
-                      activeItem={activeEventSection.toUpperCase()}
-                      onChange={(item) =>
-                        setActiveEventSection(item.toLowerCase() as "saved" | "upcoming" | "past")
-                      }
-                    />
+            <div className="pt-7">
+              <div className="grid gap-0 xl:grid-cols-[69.25rem_12rem] xl:justify-start">
+                <div className="space-y-3 xl:pr-0">
+                  <SectionNav
+                    items={["SAVED", "UPCOMING", "PAST"]}
+                    activeItem={activeEventSection.toUpperCase()}
+                    onChange={(item) =>
+                      setActiveEventSection(
+                        item.toLowerCase() as "saved" | "upcoming" | "past",
+                      )
+                    }
+                  />
 
-                    <EventLibraryContent
-                      events={activeEvents}
-                      recruiterName={profile.displayName}
-                      recruiterSlug={profile.slug}
-                    />
-                  </div>
+                  <EventLibraryContent
+                    events={activeEvents}
+                    recruiterName={profile.displayName}
+                    recruiterSlug={profile.slug}
+                  />
+                </div>
 
-                  <div
-                    className="xl:self-stretch xl:ml-10 xl:pl-10"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(hsl(var(--border)), hsl(var(--border)))",
-                      backgroundRepeat: "no-repeat",
-                      backgroundPosition: "left 0 top 2.6rem",
-                      backgroundSize: "1px calc(100% - 2.6rem)",
-                    }}
-                  >
-                    <div className="space-y-3 xl:w-fit">
-                      <h2
-                        className="relative top-[7px] text-left text-body-lg uppercase tracking-[0.01em]"
-                        style={{ color: "#FFFFFF" }}
-                      >
-                        Artists Seen
-                      </h2>
-                      <ArtistsSeenContent artists={artistsSeen} />
-                    </div>
+                <div
+                  className="xl:ml-10 xl:self-stretch xl:pl-10"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(hsl(var(--border)), hsl(var(--border)))",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "left 0 top 2.6rem",
+                    backgroundSize: "1px calc(100% - 2.6rem)",
+                  }}
+                >
+                  <div className="space-y-3 xl:w-fit">
+                    <h2
+                      className="text-body-lg relative top-[7px] text-left tracking-[0.01em] uppercase"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Artists Seen
+                    </h2>
+                    <ArtistsSeenContent artists={artistsSeen} />
                   </div>
                 </div>
               </div>
+            </div>
           </section>
         </div>
       </main>
@@ -820,9 +905,7 @@ export function ConsumerProfilePageView() {
               notificationsEnabled: nextValue,
             })
           }
-          onSignOut={() => {
-            void signOut({ redirectUrl: "/" });
-          }}
+          clerkEnabled={clerkEnabled}
           onClose={() => setSettingsOpen(false)}
         />
       ) : null}

@@ -20,7 +20,7 @@ import {
   getEventAccessAssignment,
   getEventApplication,
 } from "@/lib/event-access";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 import { resolveEventLabels } from "@/lib/event-labels";
 import { getVisibleTicketSectionsForAssignment } from "@/lib/event-ticket-visibility";
 import { formatTimeRange } from "@/lib/utils/date";
@@ -198,7 +198,7 @@ export function PublicEventDetailPage({
     getCurrentConsumerUser,
     applyToCuratedEvent,
     purchaseTicketSection,
-  } = useMockEventsStore();
+  } = useAppStore();
   const hasHydrated = useSyncExternalStore(
     () => () => {},
     () => true,

@@ -9,7 +9,7 @@ import {
   getEventAccessAssignment,
 } from "@/lib/event-access";
 import { canConsumerAccessEvent } from "@/lib/event-status";
-import { useMockEventsStore } from "@/lib/mock-store";
+import { useAppStore } from "@/lib/app-store";
 import { formatFullEventDate } from "@/lib/utils/date";
 import type { ConsumerTicketStatus, ConsumerTicketWalletEntry } from "@/types/user";
 
@@ -192,7 +192,7 @@ function TicketEventRow({
   onViewTicket,
 }: {
   quantity: number;
-  event: ReturnType<typeof useMockEventsStore>["events"][number];
+  event: ReturnType<typeof useAppStore>["events"][number];
   paymentState: "not_required" | "pending" | "paid" | "waived";
   status: ConsumerTicketStatus;
   onViewTicket: () => void;
@@ -312,7 +312,7 @@ function TicketSectionBlock({
 }: {
   entries: Array<{
     entry: ConsumerTicketWalletEntry;
-    event: ReturnType<typeof useMockEventsStore>["events"][number];
+    event: ReturnType<typeof useAppStore>["events"][number];
     groupName: string;
     paymentState: "not_required" | "pending" | "paid" | "waived";
     status: ConsumerTicketStatus;
@@ -345,7 +345,7 @@ function TicketSectionBlock({
 
       return groups;
     }, new Map<string, {
-      event: ReturnType<typeof useMockEventsStore>["events"][number];
+      event: ReturnType<typeof useAppStore>["events"][number];
       quantity: number;
       paymentState: "not_required" | "pending" | "paid" | "waived";
       status: ConsumerTicketStatus;
@@ -398,7 +398,7 @@ function TicketSectionBlock({
 }
 
 export function ConsumerTicketsPage() {
-  const { users, events, getCurrentConsumerUser } = useMockEventsStore();
+  const { users, events, getCurrentConsumerUser } = useAppStore();
   const [activeSection, setActiveSection] = useState<TicketSection>("upcoming");
   const [selectedEntrySlug, setSelectedEntrySlug] = useState<string | null>(null);
 
