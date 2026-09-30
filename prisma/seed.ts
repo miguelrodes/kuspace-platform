@@ -1,4 +1,5 @@
-import { initialDemoState } from "../lib/demo-data";
+import { demoTicketOrders, initialDemoState } from "../lib/demo-data";
+import { createTicketOrderRepository } from "../lib/db/repositories/order-repository";
 import {
   clearDatabase,
   saveConsumerUser,
@@ -26,6 +27,44 @@ async function main() {
 
   for (const user of initialDemoState.users) {
     await saveConsumerUser(user);
+  }
+
+  for (const order of demoTicketOrders) {
+    const event = initialDemoState.events.find(
+      (candidate) => candidate.id === order.eventId,
+    );
+    const section = event?.tickets.sections?.find(
+      (candidate) => candidate.id === order.ticketSectionId,
+    );
+    const phase = section?.phases.find(
+      (candidate) => candidate.id === order.ticketPhaseId,
+    );
+
+    if (!event?.organizationId || !section || !phase) {
+      throw new Error(
+        `Invalid fictional order seed for event ${order.eventId}.`,
+      );
+    }
+
+    const totalAmount = order.quantity * order.unitPrice;
+    await createTicketOrderRepository({
+      eventId: event.id,
+      organizationId: event.organizationId,
+      consumerUserId: order.consumerUserId,
+      status: "paid",
+      currency: "usd",
+      subtotalAmount: totalAmount,
+      totalAmount,
+      items: [
+        {
+          ticketSectionId: section.id,
+          ticketPhaseId: phase.id,
+          quantity: order.quantity,
+          unitPrice: order.unitPrice,
+          totalPrice: totalAmount,
+        },
+      ],
+    });
   }
 }
 

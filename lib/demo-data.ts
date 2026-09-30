@@ -55,6 +55,15 @@ type DemoEventSeed = {
   partialDraft?: boolean;
 };
 
+export type DemoTicketOrderSeed = {
+  eventId: string;
+  consumerUserId: string;
+  ticketSectionId: string;
+  ticketPhaseId: string;
+  quantity: number;
+  unitPrice: number;
+};
+
 const venueName = "Neon Harbor";
 const locationText = "Northport Waterfront";
 const demoNowIso = "2030-05-15T23:30:00.000Z";
@@ -1098,6 +1107,65 @@ export const demoUsersWithWallet: ConsumerUser[] = demoUsers.map(
     };
   },
 );
+
+export const demoTicketOrders: DemoTicketOrderSeed[] = [
+  {
+    eventId: "event-signal-bloom",
+    consumerUserId: "consumer-1",
+    ticketSectionId: "signal-bloom-2030-05-02-section-regular-entry",
+    ticketPhaseId: "signal-bloom-2030-05-02-ticket-general-release",
+    quantity: 1,
+    unitPrice: 30,
+  },
+  {
+    eventId: "event-glass-current",
+    consumerUserId: "consumer-4",
+    ticketSectionId: "glass-current-2030-05-08-section-regular-entry",
+    ticketPhaseId: "glass-current-2030-05-08-ticket-general-release",
+    quantity: 2,
+    unitPrice: 26,
+  },
+  {
+    eventId: "event-lumen-assembly",
+    consumerUserId: "consumer-1",
+    ticketSectionId: "lumen-assembly-2030-05-15-section-regular-entry",
+    ticketPhaseId: "lumen-assembly-2030-05-15-ticket-general-release",
+    quantity: 2,
+    unitPrice: 34,
+  },
+  {
+    eventId: "event-lumen-assembly",
+    consumerUserId: "consumer-10",
+    ticketSectionId: "lumen-assembly-2030-05-15-section-vip",
+    ticketPhaseId: "lumen-assembly-2030-05-15-ticket-vip-deck",
+    quantity: 1,
+    unitPrice: 78,
+  },
+  {
+    eventId: "event-low-tide-circuit",
+    consumerUserId: "consumer-1",
+    ticketSectionId: "low-tide-circuit-2030-05-22-section-vip",
+    ticketPhaseId: "low-tide-circuit-2030-05-22-ticket-vip-deck",
+    quantity: 1,
+    unitPrice: 72,
+  },
+  {
+    eventId: "event-static-garden",
+    consumerUserId: "consumer-16",
+    ticketSectionId: "static-garden-2030-05-29-section-vip",
+    ticketPhaseId: "static-garden-2030-05-29-ticket-vip-deck",
+    quantity: 1,
+    unitPrice: 64,
+  },
+  {
+    eventId: "event-parallel-rooms",
+    consumerUserId: "consumer-19",
+    ticketSectionId: "parallel-rooms-2030-06-05-section-vip",
+    ticketPhaseId: "parallel-rooms-2030-06-05-ticket-vip-deck",
+    quantity: 1,
+    unitPrice: 82,
+  },
+];
 
 export const demoRecruiterProfile: RecruiterProfile = {
   id: defaultRecruiterProfileId,
