@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import type { TicketSectionDraft } from "@/components/editor/ticket-tier-card";
+import { getDemoReferenceNow } from "@/lib/demo-clock";
 
 type TicketSummaryPanelProps = {
   sections: TicketSectionDraft[];
@@ -27,7 +28,7 @@ type NormalizedPhaseMetrics = {
   salesEnd?: string;
 };
 
-const PROTOTYPE_NOW = new Date("2030-05-15T23:30:00.000Z");
+const PROTOTYPE_NOW = getDemoReferenceNow();
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function parseNumber(value: string) {

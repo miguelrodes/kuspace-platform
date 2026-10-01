@@ -29,6 +29,7 @@ import {
   defaultOrganizationId,
   defaultRecruiterProfileId,
 } from "@/lib/event-draft";
+import { DEMO_REFERENCE_NOW_ISO } from "@/lib/demo-clock";
 import { buildOwnerEventLabel } from "@/lib/event-labels";
 
 type TicketPlan = {
@@ -73,7 +74,6 @@ export type DemoTicketOrderSeed = {
 
 const venueName = "Neon Harbor";
 const locationText = "Northport Waterfront";
-const demoNowIso = "2030-05-15T23:30:00.000Z";
 const accessGroups: AccessGroup[] = defaultAccessGroups;
 
 const demoPeople = [
@@ -182,7 +182,7 @@ function buildTicketSections(
       status === "past"
         ? eventStart
         : status === "live"
-          ? demoNowIso
+          ? DEMO_REFERENCE_NOW_ISO
           : undefined,
     releaseMode: (index === 0
       ? "manual"

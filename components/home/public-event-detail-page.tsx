@@ -192,12 +192,12 @@ export function PublicEventDetailPage({
   const router = useRouter();
   const {
     profile,
-    users,
     events,
     getEventBySlug,
     getCurrentConsumerUser,
     applyToCuratedEvent,
     purchaseTicketSection,
+    isBootstrapped,
   } = useAppStore();
   const hasHydrated = useSyncExternalStore(
     () => () => {},
@@ -240,7 +240,44 @@ export function PublicEventDetailPage({
     [audience, event, events, publicEvents],
   );
 
-  if (!hasHydrated) {
+  const labels = useMemo(
+    () => (event ? resolveEventLabels(event, recruiter) : []),
+    [event, recruiter],
+  );
+  const recruiterProfileHref = useMemo(
+    () =>
+      audience === "recruiter"
+        ? `/recprofile/${recruiter.slug}`
+        : `/cons/profile/${recruiter.slug}`,
+    [audience, recruiter.slug],
+  );
+  const currentAssignment = useMemo(
+    () =>
+      event && audience === "consumer" && currentConsumer?.id
+        ? getEventAccessAssignment(event, currentConsumer.id)
+        : undefined,
+    [audience, currentConsumer?.id, event],
+  );
+  const currentApplication = useMemo(
+    () =>
+      event && audience === "consumer" && currentConsumer?.id
+        ? getEventApplication(event, currentConsumer.id)
+        : undefined,
+    [audience, currentConsumer?.id, event],
+  );
+  const visibleTicketSections = useMemo(() => {
+    if (!event) {
+      return [];
+    }
+
+    return audience === "consumer"
+      ? getVisibleTicketSectionsForAssignment(event, currentAssignment)
+      : (event.tickets.sections ?? []).filter(
+          (section) => section.visibility === "public" && section.phases.length > 0,
+        );
+  }, [audience, currentAssignment, event]);
+
+  if (!hasHydrated || !isBootstrapped) {
     return (
       <div className="min-h-screen bg-bg text-fg">
         {audience === "recruiter" ? (
@@ -306,38 +343,6 @@ export function PublicEventDetailPage({
     );
   }
 
-  const labels = useMemo(() => resolveEventLabels(event, recruiter), [event, recruiter]);
-  const recruiterProfileHref = useMemo(
-    () =>
-      audience === "recruiter"
-        ? `/recprofile/${recruiter.slug}`
-        : `/cons/profile/${recruiter.slug}`,
-    [audience, recruiter.slug],
-  );
-  const currentAssignment = useMemo(
-    () =>
-      audience === "consumer" && currentConsumer?.id
-        ? getEventAccessAssignment(event, currentConsumer.id)
-        : undefined,
-    [audience, currentConsumer?.id, event],
-  );
-  const currentApplication = useMemo(
-    () =>
-      audience === "consumer" && currentConsumer?.id
-        ? getEventApplication(event, currentConsumer.id)
-        : undefined,
-    [audience, currentConsumer?.id, event],
-  );
-
-  const visibleTicketSections = useMemo(
-    () =>
-      audience === "consumer"
-        ? getVisibleTicketSectionsForAssignment(event, currentAssignment)
-        : (event.tickets.sections ?? []).filter(
-            (section) => section.visibility === "public" && section.phases.length > 0,
-          ),
-    [audience, currentAssignment, event],
-  );
   const showTicketsSection =
     isPublicEventStatus(event.status) &&
     event.status !== "past" &&

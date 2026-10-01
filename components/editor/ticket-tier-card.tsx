@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
 import { ReleasePhaseRow, type TicketPhaseDraft } from "@/components/editor/release-phase-row";
+import { computeTicketsPerHour } from "@/lib/ticket-metrics";
 import type { AccessGroup, TicketSectionVisibility } from "@/types/event";
 
 export type TicketSectionDraft = {
@@ -39,26 +40,6 @@ function formatCurrency(value: number) {
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function computeTicketsPerHour(
-  sold: number,
-  salesStart?: string,
-  salesEnd?: string,
-) {
-  if (sold <= 0 || !salesStart) {
-    return 0;
-  }
-
-  const start = new Date(salesStart);
-  const end = salesEnd ? new Date(salesEnd) : new Date();
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-    return 0;
-  }
-
-  const hours = Math.max((end.getTime() - start.getTime()) / (1000 * 60 * 60), 1);
-  return Number((sold / hours).toFixed(1));
 }
 
 function formatTicketsPerHour(value: number) {

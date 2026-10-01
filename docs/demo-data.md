@@ -12,6 +12,8 @@ The KUSPACE wordmark and favicon are project branding. Third-party service names
 
 The seed creates one fictional organizer workspace, eight events across draft, upcoming, live, past, and cancelled states, multi-room lineups and timetables, curated applications, guestlists, budgets, ticket phases, access assignments, consumer wallet states, and ticket orders covering the supported payment lifecycle. Ticket-tier sales and normalized orders remain separate records; the seed does not duplicate tier revenue as untracked door revenue.
 
+The fictional operating date is `2030-05-15T23:30:00.000Z`. UI analytics that need a current time use the shared clock in `lib/demo-clock.ts`, keeping event status and open-ended ticket calculations deterministic regardless of the machine or deployment date.
+
 Run the seed explicitly with:
 
 ```bash

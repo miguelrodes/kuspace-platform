@@ -4,7 +4,6 @@ import { useEffect, useSyncExternalStore } from "react";
 import type {
   ArtistProfile,
   Event,
-  EventAccessAssignment,
   EventStatus,
 } from "@/types/event";
 import type {
@@ -52,6 +51,7 @@ class ClientApiError extends Error {
 }
 
 type AppStoreState = {
+  isBootstrapped: boolean;
   profile: RecruiterProfile;
   users: ConsumerUser[];
   artists: ArtistProfile[];
@@ -91,6 +91,7 @@ const EMPTY_PROFILE: RecruiterProfile = {
 
 function getInitialStoreState(): AppStoreState {
   return {
+    isBootstrapped: false,
     profile: EMPTY_PROFILE,
     users: [],
     artists: [],
@@ -128,7 +129,7 @@ function deriveArtists(events: Event[], existingArtists: ArtistProfile[] = []) {
 }
 
 let storeState: AppStoreState = getInitialStoreState();
-let hasBootstrapped = false;
+let bootstrapStarted = false;
 
 const listeners = new Set<() => void>();
 
@@ -198,6 +199,7 @@ async function bootstrapFromDb() {
   const remoteState = await fetchJson<AppStoreState>("/api/store/bootstrap");
   updateState({
     ...remoteState,
+    isBootstrapped: true,
     artists: remoteState.artists?.length
       ? remoteState.artists
       : deriveArtists(remoteState.events),
@@ -210,6 +212,7 @@ function setMutationError(error: unknown, fallbackMessage?: string) {
 
   updateState({
     ...storeState,
+    isBootstrapped: true,
     mutationError: fallbackMessage
       ? {
           ...nextError,
@@ -868,13 +871,13 @@ async function denyCuratedApplication({
 
 function resetAppState() {
   updateState(getInitialStoreState());
-  hasBootstrapped = false;
+  bootstrapStarted = true;
   void bootstrapFromDb()
     .then(() => {
-      hasBootstrapped = true;
+      bootstrapStarted = true;
     })
     .catch((error) => {
-      hasBootstrapped = false;
+      bootstrapStarted = false;
       setMutationError(
         error,
         "We could not reload the latest data from the backend.",
@@ -886,13 +889,13 @@ export function useAppStore() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    if (hasBootstrapped) {
+    if (bootstrapStarted) {
       return;
     }
 
-    hasBootstrapped = true;
+    bootstrapStarted = true;
     void bootstrapFromDb().catch((error) => {
-      hasBootstrapped = false;
+      bootstrapStarted = false;
       setMutationError(
         error,
         "We could not load the latest data from the backend.",
