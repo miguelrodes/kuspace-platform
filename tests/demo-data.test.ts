@@ -33,4 +33,63 @@ describe("fictional public demo data", () => {
       expect(consumer.email).toMatch(/@example\.test$/);
     }
   });
+
+  it("covers every supported commerce order state", () => {
+    expect(new Set(demoTicketOrders.map((order) => order.status))).toEqual(
+      new Set([
+        "pending",
+        "checkout_started",
+        "paid",
+        "payment_failed",
+        "cancelled",
+        "expired",
+      ]),
+    );
+  });
+
+  it("demonstrates pending, accepted, and denied curated applications", () => {
+    const curatedEvent = initialDemoState.events.find(
+      (event) => event.id === "event-low-tide-circuit",
+    );
+
+    expect(
+      curatedEvent?.applications.map((application) => application.status),
+    ).toEqual(expect.arrayContaining(["pending", "accepted", "denied"]));
+    expect(
+      curatedEvent?.accessAssignments.find(
+        (assignment) => assignment.userId === "consumer-22",
+      ),
+    ).toMatchObject({
+      source: "approval",
+      paymentState: "pending",
+      accessGroupId: "group-regular-entry",
+    });
+  });
+
+  it("demonstrates active, inactive, and scanned consumer wallet states", () => {
+    const walletStatuses = new Set(
+      initialDemoState.users.flatMap((user) =>
+        (user.ticketWalletEntries ?? []).map((entry) => entry.status),
+      ),
+    );
+
+    expect(walletStatuses).toEqual(new Set(["active", "inactive", "scanned"]));
+  });
+
+  it("does not expose unsupported follower or rating metrics", () => {
+    const profile = initialDemoState.profile;
+    const pastEventCount = initialDemoState.events.filter(
+      (event) => event.status === "past",
+    ).length;
+
+    expect(profile.stats?.eventsHeld).toBe(pastEventCount);
+    expect(profile.stats?.display.followers).toBe(false);
+    expect(profile.stats?.display.publicRating).toBe(false);
+  });
+
+  it("does not duplicate seeded tier revenue as separate door revenue", () => {
+    for (const event of initialDemoState.events) {
+      expect(event.budget.doorTicketRevenue).toBe(0);
+    }
+  });
 });

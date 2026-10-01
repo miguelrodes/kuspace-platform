@@ -8,11 +8,14 @@ KUSPACE brings event planning, organizer operations, ticket configuration, and a
 
 This is an independent MVP designed and developed by Miguel Rodés. It has not been commercially launched.
 
+This repository uses synthetic demo data and is not affiliated with any real venue, artist, promoter, or event brand. The fictional dataset is intentionally populated to demonstrate event planning, curated admission, ticketing, wallet, guestlist, and attendee-reporting workflows without representing actual usage or commercial traction.
+
 ## Demo
 
 - Live Demo: Coming soon
 - Portfolio Case Study: Coming soon
 - Video Walkthrough: Coming soon
+- Recruiter Walkthrough: [90–120 second demo path](docs/recruiter-demo-walkthrough.md)
 
 ## Core Features
 
@@ -144,7 +147,7 @@ npx prisma validate
 npm run build
 ```
 
-Sanitization checkpoint (September 30, 2026): 22 test files and 113 tests passed; TypeScript, Prisma validation, and the Next.js production build also passed locally without external service access.
+Recruiter-demo checkpoint (September 30, 2026): 22 test files and 118 tests passed; TypeScript, Prisma validation, and the Next.js production build also passed locally without external service access.
 
 ## Project Status
 

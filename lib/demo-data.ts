@@ -16,8 +16,14 @@ import type {
   TimetableRow,
 } from "@/types/event";
 import type { RecruiterProfile } from "@/types/profile";
+import type { TicketOrderStatus } from "@/types/order";
 import type { ConsumerUser } from "@/types/user";
-import { syncTicketPurchaseToEvent } from "@/lib/event-access";
+import {
+  applyToCuratedEvent,
+  approveCuratedApplication,
+  denyCuratedApplication,
+  syncTicketPurchaseToEvent,
+} from "@/lib/event-access";
 import {
   defaultAccessGroups,
   defaultOrganizationId,
@@ -60,6 +66,7 @@ export type DemoTicketOrderSeed = {
   consumerUserId: string;
   ticketSectionId: string;
   ticketPhaseId: string;
+  status: TicketOrderStatus;
   quantity: number;
   unitPrice: number;
 };
@@ -486,10 +493,7 @@ function buildEvent(seed: DemoEventSeed, index: number): Event {
         (total, item) => total + item.amount,
         0,
       ),
-      doorTicketRevenue: seed.ticketPlan.reduce(
-        (total, plan) => total + plan.price * plan.quantitySold,
-        0,
-      ),
+      doorTicketRevenue: 0,
       items: seed.partialDraft
         ? seed.budgetItems.slice(0, 2)
         : seed.budgetItems,
@@ -1036,7 +1040,43 @@ const eventSeeds: DemoEventSeed[] = [
   },
 ];
 
-export const demoEvents: Event[] = eventSeeds.map(buildEvent);
+function attachCuratedApplicationStates(event: Event) {
+  if (event.id !== "event-low-tide-circuit") {
+    return event;
+  }
+
+  let nextEvent = applyToCuratedEvent(
+    event,
+    "consumer-21",
+    "2030-05-08T14:20:00.000Z",
+  );
+  nextEvent = applyToCuratedEvent(
+    nextEvent,
+    "consumer-22",
+    "2030-05-09T11:40:00.000Z",
+  );
+  nextEvent = approveCuratedApplication(nextEvent, {
+    userId: "consumer-22",
+    accessGroupId: "group-regular-entry",
+    reviewedAt: "2030-05-10T09:15:00.000Z",
+    reviewedBy: defaultRecruiterProfileId,
+  });
+  nextEvent = applyToCuratedEvent(
+    nextEvent,
+    "consumer-23",
+    "2030-05-10T16:05:00.000Z",
+  );
+
+  return denyCuratedApplication(nextEvent, {
+    userId: "consumer-23",
+    reviewedAt: "2030-05-11T10:30:00.000Z",
+    reviewedBy: defaultRecruiterProfileId,
+  });
+}
+
+export const demoEvents: Event[] = eventSeeds
+  .map(buildEvent)
+  .map(attachCuratedApplicationStates);
 
 export const defaultConsumerUserId = demoUsers[0]?.id ?? "consumer-1";
 
@@ -1062,6 +1102,13 @@ const defaultWalletEntries: ConsumerUser["ticketWalletEntries"] = [
     ticketLabel: "General Release",
     status: "scanned",
   },
+  {
+    eventSlug: "parallel-rooms-2030-06-05",
+    quantity: 1,
+    accessGroupId: "group-regular-entry",
+    ticketLabel: "First Light",
+    status: "inactive",
+  },
 ];
 
 function attachDefaultConsumerAccess(event: Event) {
@@ -1077,6 +1124,7 @@ function attachDefaultConsumerAccess(event: Event) {
     accessGroupId: walletEntry.accessGroupId,
     purchasedAt: "2030-04-10T18:30:00.000Z",
     checkedIn: walletEntry.status === "scanned",
+    paymentState: walletEntry.status === "inactive" ? "pending" : "paid",
   });
 }
 
@@ -1101,6 +1149,7 @@ export const demoUsersWithWallet: ConsumerUser[] = demoUsers.map(
       upcomingTicketEventSlugs: [
         "lumen-assembly-2030-05-15",
         "low-tide-circuit-2030-05-22",
+        "parallel-rooms-2030-06-05",
       ],
       pastTicketEventSlugs: ["signal-bloom-2030-05-02"],
       ticketWalletEntries: defaultWalletEntries?.map((entry) => ({ ...entry })),
@@ -1114,6 +1163,7 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-1",
     ticketSectionId: "signal-bloom-2030-05-02-section-regular-entry",
     ticketPhaseId: "signal-bloom-2030-05-02-ticket-general-release",
+    status: "paid",
     quantity: 1,
     unitPrice: 30,
   },
@@ -1122,6 +1172,7 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-4",
     ticketSectionId: "glass-current-2030-05-08-section-regular-entry",
     ticketPhaseId: "glass-current-2030-05-08-ticket-general-release",
+    status: "paid",
     quantity: 2,
     unitPrice: 26,
   },
@@ -1130,6 +1181,7 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-1",
     ticketSectionId: "lumen-assembly-2030-05-15-section-regular-entry",
     ticketPhaseId: "lumen-assembly-2030-05-15-ticket-general-release",
+    status: "paid",
     quantity: 2,
     unitPrice: 34,
   },
@@ -1138,6 +1190,7 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-10",
     ticketSectionId: "lumen-assembly-2030-05-15-section-vip",
     ticketPhaseId: "lumen-assembly-2030-05-15-ticket-vip-deck",
+    status: "paid",
     quantity: 1,
     unitPrice: 78,
   },
@@ -1146,6 +1199,7 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-1",
     ticketSectionId: "low-tide-circuit-2030-05-22-section-vip",
     ticketPhaseId: "low-tide-circuit-2030-05-22-ticket-vip-deck",
+    status: "paid",
     quantity: 1,
     unitPrice: 72,
   },
@@ -1154,6 +1208,7 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-16",
     ticketSectionId: "static-garden-2030-05-29-section-vip",
     ticketPhaseId: "static-garden-2030-05-29-ticket-vip-deck",
+    status: "paid",
     quantity: 1,
     unitPrice: 64,
   },
@@ -1162,8 +1217,54 @@ export const demoTicketOrders: DemoTicketOrderSeed[] = [
     consumerUserId: "consumer-19",
     ticketSectionId: "parallel-rooms-2030-06-05-section-vip",
     ticketPhaseId: "parallel-rooms-2030-06-05-ticket-vip-deck",
+    status: "paid",
     quantity: 1,
     unitPrice: 82,
+  },
+  {
+    eventId: "event-parallel-rooms",
+    consumerUserId: "consumer-1",
+    ticketSectionId: "parallel-rooms-2030-06-05-section-regular-entry",
+    ticketPhaseId: "parallel-rooms-2030-06-05-ticket-first-light",
+    status: "pending",
+    quantity: 1,
+    unitPrice: 26,
+  },
+  {
+    eventId: "event-low-tide-circuit",
+    consumerUserId: "consumer-22",
+    ticketSectionId: "low-tide-circuit-2030-05-22-section-regular-entry",
+    ticketPhaseId: "low-tide-circuit-2030-05-22-ticket-member-release",
+    status: "checkout_started",
+    quantity: 1,
+    unitPrice: 28,
+  },
+  {
+    eventId: "event-static-garden",
+    consumerUserId: "consumer-17",
+    ticketSectionId: "static-garden-2030-05-29-section-regular-entry",
+    ticketPhaseId: "static-garden-2030-05-29-ticket-general-release",
+    status: "payment_failed",
+    quantity: 1,
+    unitPrice: 29,
+  },
+  {
+    eventId: "event-parallel-rooms",
+    consumerUserId: "consumer-20",
+    ticketSectionId: "parallel-rooms-2030-06-05-section-regular-entry",
+    ticketPhaseId: "parallel-rooms-2030-06-05-ticket-first-light",
+    status: "cancelled",
+    quantity: 2,
+    unitPrice: 26,
+  },
+  {
+    eventId: "event-glass-current",
+    consumerUserId: "consumer-9",
+    ticketSectionId: "glass-current-2030-05-08-section-vip",
+    ticketPhaseId: "glass-current-2030-05-08-ticket-vip-deck",
+    status: "expired",
+    quantity: 1,
+    unitPrice: 58,
   },
 ];
 
@@ -1196,17 +1297,18 @@ export const demoRecruiterProfile: RecruiterProfile = {
     email: "events@neonharbor.example.test",
     website: "https://neonharbor.example.test",
   },
-  canFollow: true,
+  canFollow: false,
   stats: {
-    eventsHeld: 42,
+    eventsHeld: syncedDemoEvents.filter((event) => event.status === "past")
+      .length,
     citiesActive: 1,
-    followers: 6800,
-    publicRating: 4.8,
+    followers: 0,
+    publicRating: 0,
     display: {
       eventsHeld: true,
       citiesActive: true,
-      followers: true,
-      publicRating: true,
+      followers: false,
+      publicRating: false,
     },
   },
   events: {

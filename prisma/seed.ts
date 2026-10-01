@@ -51,8 +51,8 @@ async function main() {
       eventId: event.id,
       organizationId: event.organizationId,
       consumerUserId: order.consumerUserId,
-      status: "paid",
-      currency: "usd",
+      status: order.status,
+      currency: "EUR",
       subtotalAmount: totalAmount,
       totalAmount,
       items: [

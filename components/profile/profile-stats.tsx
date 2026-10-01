@@ -18,27 +18,39 @@ export function ProfileStats({ profile }: ProfileStatsProps) {
   const soundProfile = profile.soundProfile;
   const stats = profile.stats;
   const links = profile.links;
+  const showFollowers = Boolean(
+    stats?.display.followers && typeof stats.followers === "number",
+  );
+  const showPublicRating = Boolean(
+    stats?.display.publicRating && typeof stats.publicRating === "number",
+  );
 
   return (
     <div className="space-y-7">
-      <div className="space-y-1 text-body">
-        <div className="grid grid-cols-[5rem_1fr] items-baseline gap-x-3">
-          <p style={{ color: "#FFFFFF" }}>Followers:</p>
-          <p style={{ color: "#FFFFFF" }}>
-            {formatFollowers(stats?.followers)}
-          </p>
+      {showFollowers || showPublicRating ? (
+        <div className="text-body space-y-1">
+          {showFollowers ? (
+            <div className="grid grid-cols-[5rem_1fr] items-baseline gap-x-3">
+              <p style={{ color: "#FFFFFF" }}>Followers:</p>
+              <p style={{ color: "#FFFFFF" }}>
+                {formatFollowers(stats?.followers)}
+              </p>
+            </div>
+          ) : null}
+          {showPublicRating ? (
+            <div className="grid grid-cols-[5rem_1fr] items-baseline gap-x-3">
+              <p style={{ color: "#FFFFFF" }}>Rating:</p>
+              <p style={{ color: "#FFFFFF" }}>
+                {stats?.publicRating?.toFixed(1)}
+              </p>
+            </div>
+          ) : null}
         </div>
-        <div className="grid grid-cols-[5rem_1fr] items-baseline gap-x-3">
-          <p style={{ color: "#FFFFFF" }}>Rating:</p>
-          <p style={{ color: "#FFFFFF" }}>
-            {stats?.publicRating?.toFixed(1) ?? "0.0"}
-          </p>
-        </div>
-      </div>
+      ) : null}
 
       <div className="space-y-2">
         <p
-          className="text-subheading uppercase tracking-tightish"
+          className="text-subheading tracking-tightish uppercase"
           style={{ color: "#FFFFFF" }}
         >
           Sound Profile
@@ -52,12 +64,12 @@ export function ProfileStats({ profile }: ProfileStatsProps) {
 
       <div className="space-y-2">
         <p
-          className="text-subheading uppercase tracking-tightish"
+          className="text-subheading tracking-tightish uppercase"
           style={{ color: "#FFFFFF" }}
         >
           Rooms
         </p>
-        <div className="space-y-1 text-body-sm text-muted">
+        <div className="text-body-sm text-muted space-y-1">
           {soundProfile?.rooms?.map((room) => (
             <div
               key={room.name}
@@ -77,34 +89,40 @@ export function ProfileStats({ profile }: ProfileStatsProps) {
 
       <div className="space-y-2">
         <p
-          className="text-subheading uppercase tracking-tightish"
+          className="text-subheading tracking-tightish uppercase"
           style={{ color: "#FFFFFF" }}
         >
           Links
         </p>
-        <div className="space-y-1 text-body text-muted">
+        <div className="text-body text-muted space-y-1">
           {links?.instagram ? (
-            <Link href={links.instagram} className="block transition hover:text-fg">
+            <Link
+              href={links.instagram}
+              className="hover:text-fg block transition"
+            >
               Instagram
             </Link>
           ) : null}
           {links?.residentAdvisor ? (
             <Link
               href={links.residentAdvisor}
-              className="block transition hover:text-fg"
+              className="hover:text-fg block transition"
             >
               Resident Advisor
             </Link>
           ) : null}
           {links?.website ? (
-            <Link href={links.website} className="block transition hover:text-fg">
+            <Link
+              href={links.website}
+              className="hover:text-fg block transition"
+            >
               Website
             </Link>
           ) : null}
           {links?.mapsLocation ? (
             <Link
               href={links.mapsLocation}
-              className="block transition hover:text-fg"
+              className="hover:text-fg block transition"
             >
               Maps
             </Link>
