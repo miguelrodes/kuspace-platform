@@ -683,7 +683,7 @@ function EventEditorScaffold({
   return null;
 }
 
-export function EventEditorShell(props: EventEditorShellProps) {
+function BootstrappedEventEditorShell(props: EventEditorShellProps) {
   const router = useRouter();
   const {
     getEventById,
@@ -697,21 +697,18 @@ export function EventEditorShell(props: EventEditorShellProps) {
     artists,
     users,
   } = useAppStore();
-  const draftSeedRef = useRef<Event | null>(null);
-
-  if (props.mode === "new" && !draftSeedRef.current) {
-    draftSeedRef.current = createDraftEventSeed();
-  }
-
-  const draftSeed = draftSeedRef.current;
+  const [draftSeed] = useState<Event | null>(() =>
+    props.mode === "new" ? createDraftEventSeed() : null,
+  );
+  const editEventId = props.mode === "edit" ? props.eventId : null;
 
   const initialEvent = useMemo(() => {
-    if (props.mode === "new") {
+    if (!editEventId) {
       return draftSeed;
     }
 
-    return getEventById(props.eventId) ?? null;
-  }, [draftSeed, getEventById, props.mode, props.mode === "edit" ? props.eventId : null]);
+    return getEventById(editEventId) ?? null;
+  }, [draftSeed, editEventId, getEventById]);
 
   const [activeTab, setActiveTab] = useState<EditorTab>("cover");
   const [currentEventId, setCurrentEventId] = useState<string | null>(
@@ -895,7 +892,6 @@ export function EventEditorShell(props: EventEditorShellProps) {
     ticketsValue,
     timetableValue,
     saveEventEditorSections,
-    updateEventStatus,
     upsertArtists,
     users,
   ]);
@@ -1236,4 +1232,19 @@ export function EventEditorShell(props: EventEditorShellProps) {
       ) : null}
     </div>
   );
+}
+
+export function EventEditorShell(props: EventEditorShellProps) {
+  const { isBootstrapped } = useAppStore();
+
+  if (!isBootstrapped) {
+    return (
+      <div
+        aria-label="Loading event editor"
+        className="h-[32rem] animate-pulse rounded-[var(--radius-surface)] border border-border bg-panel"
+      />
+    );
+  }
+
+  return <BootstrappedEventEditorShell {...props} />;
 }

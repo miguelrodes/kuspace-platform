@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { GlobalSearchOverlay } from "@/components/layout/global-search-overlay";
 import { MutationErrorBanner } from "@/components/ui/mutation-error-banner";
@@ -33,11 +33,9 @@ export function RecruiterTopNav({
   } = useAppStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState(currentOrganizationId ?? "");
-
-  useEffect(() => {
-    setSelectedOrganizationId(currentOrganizationId ?? "");
-  }, [currentOrganizationId]);
+  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null);
+  const selectedOrganizationId =
+    pendingOrganizationId ?? currentOrganizationId ?? "";
 
   const navItems = useMemo(
     () => [
@@ -66,13 +64,13 @@ export function RecruiterTopNav({
   };
 
   const handleWorkspaceChange = async (organizationId: string) => {
-    setSelectedOrganizationId(organizationId);
+    setPendingOrganizationId(organizationId);
     setIsSwitchingWorkspace(true);
     const switched = await switchOrganization(organizationId);
     setIsSwitchingWorkspace(false);
+    setPendingOrganizationId(null);
 
     if (!switched) {
-      setSelectedOrganizationId(currentOrganizationId ?? "");
       return;
     }
 

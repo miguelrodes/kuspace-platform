@@ -448,7 +448,7 @@ export function ConsumerTicketsPage() {
           const rightTime = new Date(`${right.event.cover.date}T00:00:00.000Z`).getTime();
           return leftTime - rightTime;
         }),
-    [currentUser?.id, eventsBySlug, ticketEntries],
+    [currentUser, eventsBySlug, ticketEntries],
   );
   const { upcomingCards, pastCards, ticketCardsBySlug } = useMemo(() => {
     const nextUpcomingCards: typeof ticketCards = [];

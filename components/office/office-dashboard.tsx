@@ -30,7 +30,26 @@ function sortEventsByTab(events: Event[], tab: OfficeListTab) {
 }
 
 export function OfficeDashboard() {
-  const { profile, events } = useAppStore();
+  const { profile, events, isBootstrapped } = useAppStore();
+
+  if (!isBootstrapped) {
+    return (
+      <div className="-mt-4 border-x border-border px-4 md:px-5">
+        <section
+          aria-label="Loading office calendar"
+          className="h-[31rem] animate-pulse rounded-[var(--radius-surface)] border border-border bg-panel"
+        />
+      </div>
+    );
+  }
+
+  return <BootstrappedOfficeDashboard profile={profile} events={events} />;
+}
+
+function BootstrappedOfficeDashboard({
+  profile,
+  events,
+}: Pick<ReturnType<typeof useAppStore>, "profile" | "events">) {
   const [activeTab, setActiveTab] = useState<OfficeListTab>("live");
 
   const visibleEvents = useMemo(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
+import Link from "next/link";
 import {
   ChangeEvent,
   useEffect,
@@ -232,12 +233,12 @@ function SettingsModal({
             {clerkEnabled ? (
               <ClerkLogoutButton />
             ) : (
-              <a
+              <Link
                 href="/"
                 className="text-body text-fg block transition hover:text-[var(--accent-hex)]"
               >
                 Return Home
-              </a>
+              </Link>
             )}
             <button
               type="button"

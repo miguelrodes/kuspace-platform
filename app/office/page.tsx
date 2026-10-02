@@ -71,18 +71,6 @@ export default async function OfficePage() {
           : "Manage live, upcoming, draft, and archived events from one calendar view."
       }
     >
-      <aside
-        aria-label="Demo data disclosure"
-        className="text-body-sm text-muted mb-5 flex items-center gap-3 border-l-2 border-[var(--accent-hex)] py-1 pl-3"
-      >
-        <span className="shrink-0 tracking-[0.16em] text-[var(--accent-hex)] uppercase">
-          Demo data
-        </span>
-        <span>
-          Demo environment — all organizations, artists, events, attendees, and
-          transactions are fictional.
-        </span>
-      </aside>
       {stripeConnectStatus ? (
         <section className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.18)] backdrop-blur">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
