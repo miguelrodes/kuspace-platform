@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="title desc">
+  <title id="title">KUSPACE recruiter demo profile artwork</title>
+  <desc id="desc">Original abstract archival artwork created for the KUSPACE public demo.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#101820" />
+      <stop offset="1" stop-color="#c8ff2e" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)" />
+  <circle cx="200" cy="200" r="132" fill="none" stroke="#fff" stroke-opacity=".72" stroke-width="3" />
+  <path d="M54 230 142 78l88 152 75-112 46 80" fill="none" stroke="#fff" stroke-width="12" />
+  <path d="M70 280h260M95 304h210M124 328h152" stroke="#ff5a47" stroke-width="8" />
+</svg>

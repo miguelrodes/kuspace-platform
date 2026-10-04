@@ -476,6 +476,7 @@ export async function clearDatabase() {
   await prisma.eventRoom.deleteMany();
   await prisma.eventGenre.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.artist.deleteMany();
   await prisma.recruiterSoundProfileGenre.deleteMany();
   await prisma.recruiterSoundProfileRoom.deleteMany();
   await prisma.recruiterSoundProfile.deleteMany();
@@ -753,6 +754,11 @@ export async function saveEventAggregate(event: Event) {
 
     for (const entry of event.lineup.entries) {
       lineupEntryReferenceToId.set(entry.id, toEventScopedId(event.id, entry.id));
+      await tx.artist.upsert({
+        where: { id: entry.artistId },
+        create: { id: entry.artistId, name: entry.name },
+        update: { name: entry.name },
+      });
     }
 
     let organizationId = event.organizationId;
@@ -1196,6 +1202,21 @@ export async function getRecruiterProfileByOrganizationIdSummary(organizationId:
   });
 
   return profile ? mapRecruiterProfileModel(profile) : null;
+}
+
+export async function getAllRecruiterProfiles() {
+  const profiles = await prisma.recruiterProfile.findMany({
+    include: recruiterProfileInclude,
+    orderBy: [{ displayName: "asc" }, { id: "asc" }],
+  });
+
+  const events = await getPublicEvents();
+  return profiles.map((profile) =>
+    mapRecruiterProfileModel(
+      profile,
+      events.filter((event) => event.recruiterProfileId === profile.id),
+    ),
+  );
 }
 
 export async function getAllConsumers() {

@@ -5,7 +5,7 @@ import { RecruiterTopNav } from "@/components/layout/recruiter-top-nav";
 import { useAppStore } from "@/lib/app-store";
 
 export default function RecruiterHomePage() {
-  const { events, profile } = useAppStore();
+  const { discoveryEvents, profile, recruiters } = useAppStore();
 
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -27,8 +27,9 @@ export default function RecruiterHomePage() {
           </header>
 
           <HomeFeed
-            events={events}
+            events={discoveryEvents}
             recruiter={profile}
+            recruiters={recruiters}
             audience="recruiter"
           />
         </div>

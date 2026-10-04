@@ -9,6 +9,10 @@ export async function getRecruiterRepositorySummary() {
   return storeRepository.getRecruiterProfileSummary();
 }
 
+export async function getAllRecruiterProfilesRepository() {
+  return storeRepository.getAllRecruiterProfiles();
+}
+
 export async function getRecruiterRepositoryById(id: string) {
   return storeRepository.getRecruiterProfileById(id);
 }

@@ -8,8 +8,10 @@ const mocks = vi.hoisted(() => ({
   getRecruiterRepositorySummary: vi.fn(),
   getRecruiterRepositoryByIdSummary: vi.fn(),
   getRecruiterRepositoryByOrganizationIdSummary: vi.fn(),
+  getAllRecruiterProfilesRepository: vi.fn(),
   getAllEventsRepository: vi.fn(),
   getEventsRepositoryByOrganizationId: vi.fn(),
+  getPublicEventsRepository: vi.fn(),
   getOrganizationRepositoryById: vi.fn(),
   listMyOrganizationsService: vi.fn(),
 }));
@@ -24,6 +26,7 @@ vi.mock("@/lib/db/repositories/consumer-repository", () => ({
 }));
 
 vi.mock("@/lib/db/repositories/recruiter-repository", () => ({
+  getAllRecruiterProfilesRepository: mocks.getAllRecruiterProfilesRepository,
   getRecruiterRepositorySummary: mocks.getRecruiterRepositorySummary,
   getRecruiterRepositoryByIdSummary: mocks.getRecruiterRepositoryByIdSummary,
   getRecruiterRepositoryByOrganizationIdSummary: mocks.getRecruiterRepositoryByOrganizationIdSummary,
@@ -32,6 +35,7 @@ vi.mock("@/lib/db/repositories/recruiter-repository", () => ({
 vi.mock("@/lib/db/repositories/event-repository", () => ({
   getAllEventsRepository: mocks.getAllEventsRepository,
   getEventsRepositoryByOrganizationId: mocks.getEventsRepositoryByOrganizationId,
+  getPublicEventsRepository: mocks.getPublicEventsRepository,
 }));
 
 vi.mock("@/lib/db/repositories/organization-repository", () => ({
@@ -86,6 +90,8 @@ describe("workspace-aware bootstrap service", () => {
     });
     mocks.getRecruiterRepositoryByOrganizationIdSummary.mockResolvedValue(recruiterProfile);
     mocks.getEventsRepositoryByOrganizationId.mockResolvedValue([recruiterEvent]);
+    mocks.getAllRecruiterProfilesRepository.mockResolvedValue([recruiterProfile]);
+    mocks.getPublicEventsRepository.mockResolvedValue([recruiterEvent, unrelatedEvent]);
     mocks.getAllConsumersRepository.mockResolvedValue([buildConsumerUser()]);
     mocks.listMyOrganizationsService.mockResolvedValue([
       {
@@ -103,6 +109,11 @@ describe("workspace-aware bootstrap service", () => {
 
     expect(result?.profile.slug).toBe("aurora-quay");
     expect(result?.events.map((event) => event.id)).toEqual(["event-aurora-quay-opening"]);
+    expect(result?.discoveryEvents.map((event) => event.id)).toEqual([
+      "event-aurora-quay-opening",
+      "event-other",
+    ]);
+    expect(result?.recruiters.map((candidate) => candidate.id)).toEqual([recruiterProfile.id]);
     expect(result?.currentOrganization?.id).toBe("organization-aurora-quay");
     expect(result?.organizations).toEqual([
       {
@@ -128,6 +139,8 @@ describe("workspace-aware bootstrap service", () => {
       needsOrganizationSetup: true,
     });
     mocks.listMyOrganizationsService.mockResolvedValue([]);
+    mocks.getAllRecruiterProfilesRepository.mockResolvedValue([]);
+    mocks.getPublicEventsRepository.mockResolvedValue([]);
 
     const result = await getStoreBootstrapService();
 

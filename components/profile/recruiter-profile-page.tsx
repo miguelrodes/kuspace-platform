@@ -72,7 +72,15 @@ export function RecruiterProfilePageView({
   audience = "recruiter",
 }: RecruiterProfilePageViewProps) {
   const { signOut } = useClerk();
-  const { profile, updateProfile } = useAppStore();
+  const { profile: activeProfile, recruiters, updateProfile } = useAppStore();
+  const profile = recruiters.find((candidate) => candidate.slug === slug) ??
+    (activeProfile.slug === slug ? activeProfile : null);
+  const canManageProfile = Boolean(
+    audience === "recruiter" &&
+      profile &&
+      profile.id === activeProfile.id &&
+      profile.organizationId === activeProfile.organizationId,
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const hasHydrated = useSyncExternalStore(
@@ -82,25 +90,25 @@ export function RecruiterProfilePageView({
   );
   const publicUpcomingEvents = useMemo(
     () =>
-      getPublicEventCollection(profile.events?.upcoming ?? []).filter(
-        (event) => event.status === "live",
+      getPublicEventCollection(profile?.events?.upcoming ?? []).filter(
+        (event) => event.status === "live" || event.status === "upcoming",
       ),
-    [profile.events?.upcoming],
+    [profile?.events?.upcoming],
   );
   const publicPastEvents = useMemo(
-    () => getPublicEventCollection(profile.events?.past ?? []),
-    [profile.events?.past],
+    () => getPublicEventCollection(profile?.events?.past ?? []),
+    [profile?.events?.past],
   );
   const visibleUpcomingEvents = useMemo(
-    () => (audience === "consumer" ? publicUpcomingEvents : (profile.events?.upcoming ?? [])),
-    [audience, profile.events?.upcoming, publicUpcomingEvents],
+    () => (audience === "consumer" ? publicUpcomingEvents : (profile?.events?.upcoming ?? [])),
+    [audience, profile?.events?.upcoming, publicUpcomingEvents],
   );
   const visiblePastEvents = useMemo(
-    () => (audience === "consumer" ? publicPastEvents : (profile.events?.past ?? [])),
-    [audience, profile.events?.past, publicPastEvents],
+    () => (audience === "consumer" ? publicPastEvents : (profile?.events?.past ?? [])),
+    [audience, profile?.events?.past, publicPastEvents],
   );
 
-  if (!hasHydrated || !profile.slug) {
+  if (!hasHydrated || !activeProfile.id) {
     return (
       <div className="min-h-screen bg-bg text-fg">
         {audience === "recruiter" ? <RecruiterTopNav /> : <PublicTopNav title="Nightlife Ops System" subtitle="Clubs, Brands, Collectives" />}
@@ -114,7 +122,7 @@ export function RecruiterProfilePageView({
     );
   }
 
-  if (slug !== profile.slug) {
+  if (!profile) {
     return (
       <div className="min-h-screen bg-bg text-fg">
         {audience === "recruiter" ? (
@@ -163,7 +171,7 @@ export function RecruiterProfilePageView({
 
               <div className="min-w-0 xl:border-r xl:border-border">
                 <div className="px-4 py-4">
-                  {isEditing && audience === "recruiter" ? (
+                  {isEditing && canManageProfile ? (
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
                         <label className="text-body uppercase tracking-widerish text-fg">Display Name</label>
@@ -274,7 +282,7 @@ export function RecruiterProfilePageView({
           </section>
           </div>
 
-          {audience === "recruiter" ? (
+          {canManageProfile ? (
             <div className="flex items-start justify-start pl-4 pt-0">
               <Button
                 type="button"

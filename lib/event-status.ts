@@ -3,7 +3,7 @@ import type { AdmissionMode, Prisma } from "@prisma/client";
 import type { Event, EventStatus } from "@/types/event";
 
 export const LOCKED_EVENT_STATUSES = ["upcoming", "live", "past"] as const satisfies readonly EventStatus[];
-export const PUBLIC_EVENT_STATUSES = ["live", "past"] as const satisfies readonly EventStatus[];
+export const PUBLIC_EVENT_STATUSES = ["upcoming", "live", "past"] as const satisfies readonly EventStatus[];
 export const INTERNAL_PREVIEW_EVENT_STATUSES = ["upcoming", "live", "past"] as const satisfies readonly EventStatus[];
 export const EVENT_ADMISSION_MODES = ["public", "curated"] as const satisfies readonly AdmissionMode[];
 export const PUBLIC_ADMISSION_MODE = "public" as const satisfies AdmissionMode;

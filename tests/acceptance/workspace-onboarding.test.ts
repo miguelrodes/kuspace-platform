@@ -46,6 +46,7 @@ const repoMocks = vi.hoisted(() => ({
   getRecruiterRepositoryByIdSummary: vi.fn(),
   getRecruiterRepositoryByOrganizationIdSummary: vi.fn(),
   getRecruiterRepositoryByOrganizationId: vi.fn(),
+  getAllRecruiterProfilesRepository: vi.fn(),
   getAllConsumersRepository: vi.fn(),
   getConsumerRepositoryById: vi.fn(),
   getAllEventsRepository: vi.fn(),
@@ -115,6 +116,8 @@ vi.mock("@/lib/db/repositories/organization-repository", () => ({
 }));
 
 vi.mock("@/lib/db/repositories/recruiter-repository", () => ({
+  getAllRecruiterProfilesRepository: (...args: unknown[]) =>
+    repoMocks.getAllRecruiterProfilesRepository(...args),
   saveRecruiterRepository: (...args: unknown[]) => repoMocks.saveRecruiterRepository(...args),
   getRecruiterRepositorySummary: (...args: unknown[]) =>
     repoMocks.getRecruiterRepositorySummary(...args),
@@ -136,6 +139,9 @@ vi.mock("@/lib/db/repositories/event-repository", () => ({
   getAllEventsRepository: (...args: unknown[]) => repoMocks.getAllEventsRepository(...args),
   getEventsRepositoryByOrganizationId: (...args: unknown[]) =>
     repoMocks.getEventsRepositoryByOrganizationId(...args),
+  getPublicEventsRepository: async () => Array.from(state.events.values()).filter((event) =>
+    event.status === "live" || event.status === "past" || event.status === "upcoming",
+  ),
   saveEventRepositoryAggregate: (...args: unknown[]) =>
     repoMocks.saveEventRepositoryAggregate(...args),
   getEventRepositoryById: (...args: unknown[]) => repoMocks.getEventRepositoryById(...args),
@@ -307,6 +313,7 @@ describe("workspace onboarding acceptance", () => {
     repoMocks.getRecruiterRepositoryByOrganizationId.mockImplementation(async (organizationId: string) =>
       state.recruiterProfiles.find((profile) => profile.organizationId === organizationId) ?? null,
     );
+    repoMocks.getAllRecruiterProfilesRepository.mockImplementation(async () => state.recruiterProfiles);
     repoMocks.getAllConsumersRepository.mockImplementation(async () => state.consumers);
     repoMocks.getConsumerRepositoryById.mockImplementation(async (id: string) =>
       state.consumers.find((consumer) => consumer.id === id) ?? null,

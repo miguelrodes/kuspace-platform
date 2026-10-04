@@ -22,8 +22,9 @@ export function RecruiterTopNav({
   const pathname = usePathname();
   const router = useRouter();
   const {
-    events,
+    discoveryEvents,
     profile,
+    recruiters,
     currentOrganization,
     currentOrganizationId,
     organizations = [],
@@ -79,13 +80,19 @@ export function RecruiterTopNav({
     });
   };
 
-  const publicEvents = useMemo(() => getPublicEventCollection(events), [events]);
+  const publicEvents = useMemo(
+    () => getPublicEventCollection(discoveryEvents),
+    [discoveryEvents],
+  );
   const labels = useMemo(
     () =>
       Array.from(
         new Map(
-          events
-            .flatMap((event) => resolveEventLabels(event, profile))
+          discoveryEvents
+            .flatMap((event) => {
+              const owner = recruiters.find((candidate) => candidate.id === event.recruiterProfileId) ?? profile;
+              return resolveEventLabels(event, owner);
+            })
             .map((label) => [
               label.id,
               {
@@ -97,18 +104,16 @@ export function RecruiterTopNav({
             ]),
         ).values(),
       ),
-    [events, profile],
+    [discoveryEvents, profile, recruiters],
   );
   const nightclubs = useMemo(
-    () => [
-      {
-        id: profile.id,
-        name: profile.displayName,
-        slug: profile.slug,
-        avatarImageUrl: profile.media?.avatarImageUrl,
-      },
-    ],
-    [profile.displayName, profile.id, profile.media?.avatarImageUrl, profile.slug],
+    () => recruiters.map((recruiter) => ({
+      id: recruiter.id,
+      name: recruiter.displayName,
+      slug: recruiter.slug,
+      avatarImageUrl: recruiter.media?.avatarImageUrl,
+    })),
+    [recruiters],
   );
 
   return (

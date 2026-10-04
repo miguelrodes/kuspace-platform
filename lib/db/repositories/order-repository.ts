@@ -148,6 +148,7 @@ function isRetryableTransactionError(error: unknown) {
 }
 
 export async function createTicketOrderRepository(input: {
+  id?: string;
   eventId: string;
   organizationId: string;
   consumerUserId: string;
@@ -159,6 +160,7 @@ export async function createTicketOrderRepository(input: {
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;
   items: Array<{
+    id?: string;
     ticketSectionId: string;
     ticketPhaseId: string;
     quantity: number;
@@ -168,6 +170,7 @@ export async function createTicketOrderRepository(input: {
 }) {
   const order = await prisma.ticketOrder.create({
     data: {
+      id: input.id,
       eventId: input.eventId,
       organizationId: input.organizationId,
       consumerUserId: input.consumerUserId,
@@ -179,7 +182,7 @@ export async function createTicketOrderRepository(input: {
       stripeCheckoutSessionId: input.stripeCheckoutSessionId,
       stripePaymentIntentId: input.stripePaymentIntentId,
       items: {
-        create: input.items,
+        create: input.items.map((item) => ({ ...item })),
       },
     },
     include: ticketOrderInclude,

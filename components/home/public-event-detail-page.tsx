@@ -193,6 +193,8 @@ export function PublicEventDetailPage({
   const {
     profile,
     events,
+    discoveryEvents,
+    recruiters,
     getEventBySlug,
     getCurrentConsumerUser,
     applyToCuratedEvent,
@@ -206,9 +208,14 @@ export function PublicEventDetailPage({
   );
   const [showApplyDialog, setShowApplyDialog] = useState(false);
 
-  const event = getEventBySlug(slug);
+  const event = (audience === "recruiter" ? discoveryEvents : events).find(
+    (candidate) => candidate.slug === slug,
+  ) ?? getEventBySlug(slug);
   const currentConsumer = getCurrentConsumerUser();
-  const publicEvents = useMemo(() => getPublicEventCollection(events), [events]);
+  const publicEvents = useMemo(
+    () => getPublicEventCollection(discoveryEvents),
+    [discoveryEvents],
+  );
 
   useEffect(() => {
     if (!event) {
@@ -225,7 +232,7 @@ export function PublicEventDetailPage({
     }
   }, [audience, event, router]);
 
-  const recruiter = profile;
+  const recruiter = recruiters.find((candidate) => candidate.id === event?.recruiterProfileId) ?? profile;
 
   const relatedEvents = useMemo(
     () => {
@@ -233,11 +240,11 @@ export function PublicEventDetailPage({
         return [];
       }
 
-      const sourceEvents = audience === "consumer" ? publicEvents : events;
+      const sourceEvents = publicEvents;
 
       return getRelatedEvents(event, sourceEvents);
     },
-    [audience, event, events, publicEvents],
+    [audience, event, publicEvents],
   );
 
   const labels = useMemo(

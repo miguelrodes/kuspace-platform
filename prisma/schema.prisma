@@ -466,6 +466,7 @@ model LineupEntry {
   kind      LineupEntryKind?
   sortOrder Int
   event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  artist    Artist            @relation(fields: [artistId], references: [id], onDelete: Restrict)
   roomLinks LineupEntryRoom[]
   timetableRows TimetableRow[]
 
@@ -474,6 +475,18 @@ model LineupEntry {
   @@index([artistId])
   @@index([clientKey])
   @@map("event_lineup_entries")
+}
+
+/// Shared artist identity reused by lineup entries across events.
+model Artist {
+  id           String        @id
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  lineupEntries LineupEntry[]
+
+  @@index([name])
+  @@map("artists")
 }
 
 /// Join table so one lineup entry can belong to multiple rooms.

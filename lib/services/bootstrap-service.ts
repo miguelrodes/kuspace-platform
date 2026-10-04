@@ -2,6 +2,7 @@ import type { Event } from "@/types/event";
 import { getCurrentAppActorService } from "@/lib/services/auth-actor-service";
 import { getConsumerRepositoryById, getConsumersRepositoryByIds } from "@/lib/db/repositories/consumer-repository";
 import {
+  getAllRecruiterProfilesRepository,
   getRecruiterRepositorySummary,
   getRecruiterRepositoryByIdSummary,
   getRecruiterRepositoryByOrganizationIdSummary,
@@ -80,7 +81,7 @@ export async function getStoreBootstrapService() {
   const actor = await getCurrentAppActorService();
 
   if (actor.role === "recruiter" && actor.currentRecruiterProfileId) {
-    const [organization, profile, events, organizations] = await Promise.all([
+    const [organization, profile, events, organizations, recruiters, discoveryEvents] = await Promise.all([
       actor.currentOrganizationId
         ? getOrganizationRepositoryById(actor.currentOrganizationId)
         : Promise.resolve(null),
@@ -91,6 +92,8 @@ export async function getStoreBootstrapService() {
         ? getEventsRepositoryByOrganizationId(actor.currentOrganizationId)
         : Promise.resolve([]),
       listMyOrganizationsService(),
+      getAllRecruiterProfilesRepository(),
+      getPublicEventsRepository(),
     ]);
 
     const relatedConsumerIds = getRelatedConsumerIds(events);
@@ -101,8 +104,10 @@ export async function getStoreBootstrapService() {
 
     return {
       profile: hydratedProfile,
+      recruiters,
       users: visibleUsers,
       events,
+      discoveryEvents,
       artists: deriveArtists(events),
       currentRole: actor.role,
       currentConsumerUserId: actor.currentConsumerUserId,
@@ -121,8 +126,10 @@ export async function getStoreBootstrapService() {
 
     return {
       profile: EMPTY_RECRUITER_PROFILE,
+      recruiters: await getAllRecruiterProfilesRepository(),
       users: [],
       events: [],
+      discoveryEvents: await getPublicEventsRepository(),
       artists: [],
       currentRole: actor.role,
       currentConsumerUserId: actor.currentConsumerUserId,
@@ -136,12 +143,13 @@ export async function getStoreBootstrapService() {
     };
   }
 
-  const [profile, allEvents, user] = await Promise.all([
+  const [profile, allEvents, user, recruiters] = await Promise.all([
     getRecruiterRepositorySummary(),
     getPublicEventsRepository(),
     actor.role === "consumer" && actor.currentConsumerUserId
       ? getConsumerRepositoryById(actor.currentConsumerUserId)
       : Promise.resolve(null),
+    getAllRecruiterProfilesRepository(),
   ]);
 
   if (!profile) {
@@ -153,8 +161,10 @@ export async function getStoreBootstrapService() {
 
   return {
     profile: attachProfileEvents(profile, visibleEvents),
+    recruiters,
     users,
     events: visibleEvents,
+    discoveryEvents: visibleEvents,
     artists: deriveArtists(visibleEvents),
     currentRole: actor.role,
     currentConsumerUserId: actor.currentConsumerUserId,

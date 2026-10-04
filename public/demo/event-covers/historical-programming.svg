@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-labelledby="title desc">
+  <title id="title">Historical programming demo artwork</title>
+  <desc id="desc">Original abstract event artwork created for the KUSPACE public demo; not an event poster.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#090b0d" />
+      <stop offset=".65" stop-color="#243b3d" />
+      <stop offset="1" stop-color="#c8ff2e" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="url(#bg)" />
+  <g fill="none" stroke="#f4f1e8" stroke-opacity=".72" stroke-width="12">
+    <path d="M95 125 410 65l208 275-277 286Z" />
+    <path d="m565 155 378-74 168 295-320 270Z" />
+    <path d="m325 90 526 578" />
+  </g>
+  <rect x="82" y="570" width="720" height="112" fill="#080a0d" fill-opacity=".82" />
+  <text x="118" y="640" fill="#fff" font-family="sans-serif" font-size="44" font-weight="700" letter-spacing="7">HISTORICAL PROGRAMMING</text>
+  <text x="120" y="670" fill="#c8ff2e" font-family="sans-serif" font-size="17" letter-spacing="4">KUSPACE PUBLIC DEMO ARTWORK</text>
+</svg>

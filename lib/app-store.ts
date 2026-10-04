@@ -53,9 +53,11 @@ class ClientApiError extends Error {
 type AppStoreState = {
   isBootstrapped: boolean;
   profile: RecruiterProfile;
+  recruiters: RecruiterProfile[];
   users: ConsumerUser[];
   artists: ArtistProfile[];
   events: Event[];
+  discoveryEvents: Event[];
   currentRole: "consumer" | "recruiter" | null;
   currentConsumerUserId: string | null;
   currentRecruiterProfileId: string | null;
@@ -93,9 +95,11 @@ function getInitialStoreState(): AppStoreState {
   return {
     isBootstrapped: false,
     profile: EMPTY_PROFILE,
+    recruiters: [],
     users: [],
     artists: [],
     events: [],
+    discoveryEvents: [],
     currentRole: null,
     currentConsumerUserId: null,
     currentRecruiterProfileId: null,
@@ -199,6 +203,12 @@ async function bootstrapFromDb() {
   const remoteState = await fetchJson<AppStoreState>("/api/store/bootstrap");
   updateState({
     ...remoteState,
+    recruiters: remoteState.recruiters?.length
+      ? remoteState.recruiters
+      : remoteState.profile?.id
+        ? [remoteState.profile]
+        : [],
+    discoveryEvents: remoteState.discoveryEvents ?? remoteState.events,
     isBootstrapped: true,
     artists: remoteState.artists?.length
       ? remoteState.artists
