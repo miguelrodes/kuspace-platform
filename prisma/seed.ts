@@ -12,6 +12,7 @@ import {
 } from "../lib/db/store-repository";
 import { assertPublicDemoDatabaseTargets } from "./seed-guards";
 import platformDemoSeed from "./platform-demo-seed.json";
+import { buildSyntheticTicketSales } from "./synthetic-ticket-sales";
 
 const FROZEN_PRIVATE_REFERENCE = "137691c9d09203c5429aa71150668169ebad5913";
 const platformSeed = platformDemoSeed as unknown as {
@@ -50,22 +51,13 @@ function buildSyntheticEvents(consumers: ConsumerUser[]) {
     ticketPhaseId: string;
     accessGroupId: string;
     unitPrice: number;
+    quantity: number;
     checkedIn: boolean;
   }> = [];
 
   const events = platformSeed.events.map((sourceEvent) => {
     const event = structuredClone(sourceEvent);
-    const canHaveSyntheticSales = event.status === "live" || event.status === "past";
-    const selectedSection = canHaveSyntheticSales
-      ? event.tickets.sections?.find((section) =>
-          section.phases.some((phase) => phase.price > 0 && phase.quantityAvailable >= 3),
-        )
-      : undefined;
-    const selectedPhase = selectedSection?.phases.find(
-      (phase) => phase.price > 0 && phase.quantityAvailable >= 3 && phase.status === "live",
-    ) ?? selectedSection?.phases.find(
-      (phase) => phase.price > 0 && phase.quantityAvailable >= 3,
-    );
+    const sales = buildSyntheticTicketSales(event, consumers.length);
     const group = event.guestlist.accessGroups[0];
     const checkedIn = event.status === "past";
 
@@ -94,48 +86,58 @@ function buildSyntheticEvents(consumers: ConsumerUser[]) {
       notes: "Synthetic reconstructed demo timetable; not a verified historical schedule.",
     }));
 
+    const soldByPhase = new Map<string, number>();
+    for (const sale of sales) {
+      soldByPhase.set(sale.phaseId, (soldByPhase.get(sale.phaseId) ?? 0) + sale.quantity);
+    }
     for (const section of event.tickets.sections ?? []) {
       for (const phase of section.phases) {
-        phase.quantitySold = phase.id === selectedPhase?.id ? 3 : 0;
+        phase.quantitySold = soldByPhase.get(phase.id) ?? 0;
+        if (event.status === "draft" || event.status === "cancelled") {
+          phase.status = "upcoming";
+        }
       }
     }
 
-    if (selectedSection && selectedPhase && group) {
-      for (let attendeeIndex = 0; attendeeIndex < 3; attendeeIndex += 1) {
-        const consumer = consumers[(orderIndex + attendeeIndex) % consumers.length];
-        orderIndex += 1;
-        const id = `demo-order-${event.id}-${attendeeIndex + 1}`;
-        const assignment = {
-          eventId: event.id,
-          userId: consumer.id,
-          accessGroupId: group.id,
-          source: "purchase" as const,
-          paymentState: "paid" as const,
-          checkedIn,
-          assignedAt: `${event.cover.date || "2016-01-01"}T12:00:00.000Z`,
-          notes: "Synthetic demo ticket sale; no real payment was processed.",
-        };
-        event.accessAssignments.push(assignment);
-        event.guestlist.entries.push({
-          id: `${id}-guestlist`,
-          source: "user",
-          accessGroupId: group.id,
-          userId: consumer.id,
-          checkedIn,
-          createdAt: assignment.assignedAt,
-        });
-        orders.push({
-          id,
-          itemId: `${id}-item-1`,
-          event,
-          consumerUserId: consumer.id,
-          ticketSectionId: selectedSection.id,
-          ticketPhaseId: selectedPhase.id,
-          accessGroupId: group.id,
-          unitPrice: selectedPhase.price,
-          checkedIn,
-        });
+    for (const [saleIndex, sale] of sales.entries()) {
+      const accessGroup = event.guestlist.accessGroups.find((candidate) => candidate.id === sale.accessGroupId);
+      if (!accessGroup) {
+        throw new Error(`Missing synthetic access group for ${event.id}/${sale.sectionId}.`);
       }
+      const consumer = consumers[orderIndex % consumers.length];
+      orderIndex += 1;
+      const id = `demo-order-${event.id}-${saleIndex + 1}`;
+      const assignment = {
+        eventId: event.id,
+        userId: consumer.id,
+        accessGroupId: accessGroup.id,
+        source: "purchase" as const,
+        paymentState: "paid" as const,
+        checkedIn,
+        assignedAt: `${event.cover.date || "2016-01-01"}T12:00:00.000Z`,
+        notes: "Synthetic demo ticket allocation; no real payment was processed.",
+      };
+      event.accessAssignments.push(assignment);
+      event.guestlist.entries.push({
+        id: `${id}-guestlist`,
+        source: "user",
+        accessGroupId: accessGroup.id,
+        userId: consumer.id,
+        checkedIn,
+        createdAt: assignment.assignedAt,
+      });
+      orders.push({
+        id,
+        itemId: `${id}-item-1`,
+        event,
+        consumerUserId: consumer.id,
+        ticketSectionId: sale.sectionId,
+        ticketPhaseId: sale.phaseId,
+        accessGroupId: accessGroup.id,
+        unitPrice: sale.unitPrice,
+        quantity: sale.quantity,
+        checkedIn,
+      });
     }
 
     const manualName = consumers[(orderIndex + 4) % consumers.length];
@@ -152,7 +154,7 @@ function buildSyntheticEvents(consumers: ConsumerUser[]) {
       });
     }
     event.guestlist.summary = {
-      ticketsSold: event.accessAssignments.length,
+      ticketsSold: sales.reduce((total, sale) => total + sale.quantity, 0),
       manualGuests: group ? 1 : 0,
       totalAttending: event.accessAssignments.length + (group ? 1 : 0),
     };
@@ -213,7 +215,7 @@ async function main() {
   }
 
   for (const order of orders) {
-    const totalAmount = order.unitPrice;
+    const totalAmount = order.unitPrice * order.quantity;
     await createTicketOrderRepository({
       id: order.id,
       eventId: order.event.id,
@@ -228,7 +230,7 @@ async function main() {
           id: order.itemId,
           ticketSectionId: order.ticketSectionId,
           ticketPhaseId: order.ticketPhaseId,
-          quantity: 1,
+          quantity: order.quantity,
           unitPrice: order.unitPrice,
           totalPrice: totalAmount,
         },
@@ -240,7 +242,7 @@ async function main() {
     const consumerOrders = orders.filter((order) => order.consumerUserId === consumer.id);
     const walletEntries = consumerOrders.map((order) => ({
       eventSlug: order.event.slug,
-      quantity: 1,
+      quantity: order.quantity,
       accessGroupId: order.accessGroupId,
       ticketLabel: order.event.tickets.sections?.flatMap((section) => section.phases)
         .find((phase) => phase.id === order.ticketPhaseId)?.name,

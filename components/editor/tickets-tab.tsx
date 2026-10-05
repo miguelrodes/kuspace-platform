@@ -62,7 +62,7 @@ function normalizePhaseForEventStatus(
   phase: TicketPhaseDraft,
   eventStatus: EventStatus,
 ): TicketPhaseDraft {
-  if (eventStatus === "draft" || eventStatus === "upcoming") {
+  if (eventStatus === "draft") {
     return {
       ...phase,
       quantitySold: "0",
