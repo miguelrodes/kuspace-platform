@@ -357,7 +357,7 @@ function mapEventModel(
         id: row.clientKey ?? row.id,
         title: row.title,
         lineupEntryId: row.lineupEntry?.clientKey ?? row.lineupEntryId ?? undefined,
-        room: row.eventRoom?.clientKey ?? row.roomName ?? undefined,
+        room: row.eventRoom?.name ?? row.roomName ?? undefined,
         notes: row.notes ?? undefined,
         startTime: row.startTime,
         endTime: row.endTime,

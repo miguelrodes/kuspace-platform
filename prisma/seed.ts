@@ -55,9 +55,12 @@ function buildSyntheticEvents(consumers: ConsumerUser[]) {
 
   const events = platformSeed.events.map((sourceEvent) => {
     const event = structuredClone(sourceEvent);
-    const selectedSection = event.tickets.sections?.find((section) =>
-      section.phases.some((phase) => phase.price > 0 && phase.quantityAvailable >= 3),
-    );
+    const canHaveSyntheticSales = event.status === "live" || event.status === "past";
+    const selectedSection = canHaveSyntheticSales
+      ? event.tickets.sections?.find((section) =>
+          section.phases.some((phase) => phase.price > 0 && phase.quantityAvailable >= 3),
+        )
+      : undefined;
     const selectedPhase = selectedSection?.phases.find(
       (phase) => phase.price > 0 && phase.quantityAvailable >= 3 && phase.status === "live",
     ) ?? selectedSection?.phases.find(
