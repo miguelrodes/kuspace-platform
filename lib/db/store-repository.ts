@@ -4,7 +4,7 @@ import type { RecruiterProfile } from "@/types/profile";
 import type { ConsumerUser } from "@/types/user";
 import { getPublicEventWhereInput } from "@/lib/event-status";
 import { prisma } from "@/lib/prisma";
-import { resolveHistoricalDemoArt } from "@/lib/demo-event-art";
+import { resolveHistoricalDemoArt, resolveRecruiterDemoArt, resolveRecruiterLabelAvatar } from "@/lib/demo-event-art";
 
 const DRAFT_DATE_SENTINEL = "1970-01-01";
 
@@ -170,10 +170,10 @@ function mapRecruiterProfileModel(
     recruiterType: profile.recruiterType,
     realName: profile.realName ?? undefined,
     displayName: profile.displayName,
-    media: {
+    media: resolveRecruiterDemoArt(profile.slug, {
       avatarImageUrl: profile.avatarImageUrl ?? undefined,
       bannerImageUrl: profile.bannerImageUrl ?? undefined,
-    },
+    }),
     bio: profile.bio ?? undefined,
     location: profile.locationDisplayText
       ? { displayText: profile.locationDisplayText }
@@ -415,7 +415,10 @@ function mapEventModel(
       id: link.eventLabel.id,
       name: link.eventLabel.name,
       profileSlug: link.eventLabel.profileSlug ?? undefined,
-      avatarImageUrl: link.eventLabel.avatarImageUrl ?? undefined,
+      avatarImageUrl: resolveRecruiterLabelAvatar(
+        link.eventLabel.profileSlug ?? undefined,
+        link.eventLabel.avatarImageUrl ?? undefined,
+      ),
     })),
   };
 }

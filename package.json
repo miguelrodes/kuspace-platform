@@ -8,7 +8,6 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo:art": "node scripts/generate-demo-art.mjs",
     "verify:phase4": "npm test && npm run build && npx tsc --noEmit",
     "verify:phase5": "npm test && npm run build && npx tsc --noEmit",
     "verify:phase6": "npm test && npm run build && npx tsc --noEmit",

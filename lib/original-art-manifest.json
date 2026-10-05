@@ -1,0 +1,48 @@
+{
+  "events": {
+    "afterlife-2016-09-01": "/demo/original-art/event-covers/afterlife-2016-09-01.jpg",
+    "elrow-2016-09-03": "/demo/original-art/event-covers/elrow-2016-09-03.jpg",
+    "sundays-at-space-2016-09-04": "/demo/original-art/event-covers/sundays-at-space-2016-09-04.jpg",
+    "onyx-2016-09-05": "/demo/original-art/event-covers/onyx-2016-09-05.jpg",
+    "glitterbox-2016-09-02": "/demo/original-art/event-covers/glitterbox-2016-09-02.jpg",
+    "afterlife-2016-09-08": "/demo/original-art/event-covers/afterlife-2016-09-08.jpg",
+    "glitterbox-2016-09-09": "/demo/original-art/event-covers/glitterbox-2016-09-09.jpg",
+    "carl-cox-the-final-chapter-2016-09-13": "/demo/original-art/event-covers/carl-cox-the-final-chapter-2016-09-13.jpg",
+    "carl-cox-the-final-chapter-2016-08-30": "/demo/original-art/event-covers/carl-cox-the-final-chapter-2016-09-13.jpg",
+    "carl-cox-the-final-chapter-2016-09-06": "/demo/original-art/event-covers/carl-cox-the-final-chapter-2016-09-13.jpg",
+    "afterlife-2016-09-15": "/demo/original-art/event-covers/afterlife-2016-09-01.jpg",
+    "glitterbox-2016-09-16": "/demo/original-art/event-covers/glitterbox-2016-09-02.jpg",
+    "sundays-at-space-2016-09-18": "/demo/original-art/event-covers/sundays-at-space-2016-09-18.jpg",
+    "sundays-at-space-2016-08-28": "/demo/original-art/event-covers/sundays-at-space-2016-09-18.jpg",
+    "sundays-at-space-2016-09-11": "/demo/original-art/event-covers/sundays-at-space-2016-09-18.jpg",
+    "elrow-2016-09-10": "/demo/original-art/event-covers/elrow-2016-09-10.jpg",
+    "carl-cox-the-final-chapter-2016-09-20": "/demo/original-art/event-covers/carl-cox-the-final-chapter-2016-09-20.jpg",
+    "afterlife-2016-09-22": "/demo/original-art/event-covers/afterlife-2016-09-22.jpg",
+    "glitterbox-2016-09-23": "/demo/original-art/event-covers/glitterbox-2016-09-23.jpg",
+    "brasilio-presenta-la-troya-2016-09-21": "/demo/original-art/event-covers/brasilio-presenta-la-troya-2016-09-21.jpg",
+    "brasilio-presenta-la-troya-2016-09-07": "/demo/original-art/event-covers/brasilio-presenta-la-troya-2016-09-21.jpg",
+    "elrow-2016-09-24": "/demo/original-art/event-covers/elrow-2016-09-24.jpg",
+    "space-beach-club-2016-09-27": "/demo/original-art/event-covers/space-beach-club-2016-09-27.jpg",
+    "sundays-at-space-2016-09-25": "/demo/original-art/event-covers/sundays-at-space-2016-09-25.jpg",
+    "afterlife-2016-09-29": "/demo/original-art/event-covers/afterlife-2016-09-29.jpg",
+    "circoloco-dc10-2016-09-05": "/demo/original-art/event-covers/draft-placeholder.jpg",
+    "dc10-paradise-2016-09-07": "/demo/original-art/event-covers/draft-placeholder.jpg",
+    "dc10-paradise-2016-09-14": "/demo/original-art/event-covers/draft-placeholder.jpg",
+    "circoloco-dc10-2016-09-19": "/demo/original-art/event-covers/dc10-circoloco-2016-09-19.png",
+    "dc10-paradise-2016-09-21": "/demo/original-art/event-covers/dc10-paradise-2016-09-21.png",
+    "dc10-circoloco-2016-09-26": "/demo/original-art/event-covers/dc10-circoloco-2016-09-26.png",
+    "paradise-closing-dc10-2016-09-28": "/demo/original-art/event-covers/dc10-paradise-closing-2016-09-28.png",
+    "circoloco-dc10-2016-10-03": "/demo/original-art/event-covers/dc10-circoloco-2016-10-03.png",
+    "circoloco-closing-dc10-2016-10-10": "/demo/original-art/event-covers/dc10-circoloco-closing-2016-10-10.png"
+  },
+  "profiles": {
+    "space-ibiza": {
+      "avatarImageUrl": "/demo/original-art/profiles/space-ibiza-avatar.jpg",
+      "bannerImageUrl": "/demo/original-art/profiles/space-ibiza-banner.jpg"
+    },
+    "dc10-ibiza": {
+      "avatarImageUrl": "/demo/original-art/profiles/dc10-ibiza-avatar.jpg",
+      "bannerImageUrl": "/demo/original-art/profiles/dc10-ibiza-banner.png"
+    }
+  }
+}
