@@ -13,6 +13,7 @@ import {
 import { assertPublicDemoDatabaseTargets } from "./seed-guards";
 import platformDemoSeed from "./platform-demo-seed.json";
 import { buildSyntheticTicketSales } from "./synthetic-ticket-sales";
+import { resolveHistoricalDemoArt } from "../lib/demo-event-art";
 
 const FROZEN_PRIVATE_REFERENCE = "137691c9d09203c5429aa71150668169ebad5913";
 const platformSeed = platformDemoSeed as unknown as {
@@ -57,6 +58,10 @@ function buildSyntheticEvents(consumers: ConsumerUser[]) {
 
   const events = platformSeed.events.map((sourceEvent) => {
     const event = structuredClone(sourceEvent);
+    event.cover = {
+      ...event.cover,
+      ...resolveHistoricalDemoArt(event.slug, event.cover.imageUrl, event.cover.imageAlt),
+    };
     const sales = buildSyntheticTicketSales(event, consumers.length);
     const group = event.guestlist.accessGroups[0];
     const checkedIn = event.status === "past";

@@ -4,6 +4,7 @@ import type { RecruiterProfile } from "@/types/profile";
 import type { ConsumerUser } from "@/types/user";
 import { getPublicEventWhereInput } from "@/lib/event-status";
 import { prisma } from "@/lib/prisma";
+import { resolveHistoricalDemoArt } from "@/lib/demo-event-art";
 
 const DRAFT_DATE_SENTINEL = "1970-01-01";
 
@@ -255,6 +256,7 @@ function mapConsumerUserModel(
 function mapEventModel(
   event: Prisma.EventGetPayload<{ include: typeof eventInclude }>,
 ): Event {
+  const artwork = resolveHistoricalDemoArt(event.slug, event.imageUrl, event.imageAlt);
   const guestlistEntries: GuestlistEntry[] = event.guestlistEntries.map((entry) =>
     entry.source === "user" && entry.consumerUserId
       ? {
@@ -319,8 +321,8 @@ function mapEventModel(
         start: event.timeStart ?? "",
         end: event.timeEnd ?? "",
       },
-      imageUrl: event.imageUrl,
-      imageAlt: event.imageAlt,
+      imageUrl: artwork.imageUrl,
+      imageAlt: artwork.imageAlt,
       location: event.location,
       venue: event.venue,
       capacityTarget: event.capacityTarget,
