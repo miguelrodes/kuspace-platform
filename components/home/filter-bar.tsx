@@ -100,7 +100,7 @@ export function FilterBar({
           return (
             <div key={option.value} className="inline-flex items-end gap-2">
               {index > 0 ? (
-                <span className="pb-[1px] text-lg uppercase tracking-widerish leading-none text-white">
+                <span className="pb-[1px] text-base uppercase tracking-widerish leading-none text-white">
                   |
                 </span>
               ) : null}
@@ -108,7 +108,7 @@ export function FilterBar({
                 type="button"
                 onClick={() => onStatusChange(option.value)}
                 className={[
-                  "h-auto rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-lg uppercase tracking-widerish leading-none transition",
+                  "h-auto rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-base uppercase tracking-widerish leading-none transition",
                   isActive
                     ? "bg-transparent text-white"
                     : "text-muted hover:text-fg",

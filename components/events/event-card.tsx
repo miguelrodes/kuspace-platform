@@ -56,8 +56,14 @@ export function EventCard({
         />
       ) : null}
 
-      <div className={`relative ${styles.content}`}>
-        {topRightSlot ? <div className="absolute right-2 top-2 z-10">{topRightSlot}</div> : null}
+      <div
+        className={`relative ${styles.content} ${useOverlayLink ? "pointer-events-none" : ""}`}
+      >
+        {topRightSlot ? (
+          <div className="pointer-events-auto absolute right-2 top-2 z-10">
+            {topRightSlot}
+          </div>
+        ) : null}
         <EventPoster imageUrl={imageUrl} imageAlt={imageAlt} aspectClassName={styles.posterAspect} />
 
         <div className={styles.body}>
@@ -82,7 +88,11 @@ export function EventCard({
             </p>
           </div>
 
-          {footer ? <div className={styles.footer}>{footer}</div> : null}
+          {footer ? (
+            <div className={`${styles.footer} ${useOverlayLink ? "pointer-events-auto" : ""}`}>
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </>

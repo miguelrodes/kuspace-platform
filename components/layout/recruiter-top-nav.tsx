@@ -131,34 +131,25 @@ export function RecruiterTopNav({
                 className="block h-10 w-auto translate-y-[3px]"
               />
             </Link>
-            {currentOrganization ? (
+            {currentOrganization && organizations.length > 1 ? (
               <div className="min-w-0 space-y-0.5 pb-0.5">
-                <p className="truncate text-body-sm uppercase tracking-[0.12em] text-muted">
-                  Workspace
-                </p>
-                {organizations.length > 1 ? (
-                  <select
-                    value={selectedOrganizationId}
-                    onChange={(event) => void handleWorkspaceChange(event.target.value)}
-                    disabled={isSwitchingWorkspace}
-                    className="max-w-[14rem] border-0 bg-transparent p-0 text-body text-fg outline-none"
-                    aria-label="Switch workspace"
-                  >
-                    {organizations.map((membership) => (
-                      <option
-                        key={membership.organization.id}
-                        value={membership.organization.id}
-                        className="bg-panel text-fg"
-                      >
-                        {membership.organization.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="truncate text-body text-fg">
-                    {currentOrganization.name}
-                  </p>
-                )}
+                <select
+                  value={selectedOrganizationId}
+                  onChange={(event) => void handleWorkspaceChange(event.target.value)}
+                  disabled={isSwitchingWorkspace}
+                  className="max-w-[14rem] border-0 bg-transparent p-0 text-body text-fg outline-none"
+                  aria-label="Switch workspace"
+                >
+                  {organizations.map((membership) => (
+                    <option
+                      key={membership.organization.id}
+                      value={membership.organization.id}
+                      className="bg-panel text-fg"
+                    >
+                      {membership.organization.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : null}
           </div>
@@ -167,7 +158,7 @@ export function RecruiterTopNav({
         <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-0">
           <nav
             aria-label="Recruiter navigation"
-            className="ml-5 flex items-center gap-7 text-subheading text-muted md:ml-4 md:gap-8"
+            className="ml-5 flex translate-y-[6px] items-center gap-7 text-base text-muted md:ml-4 md:gap-8"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             {navItems.map((item) => (
@@ -176,7 +167,7 @@ export function RecruiterTopNav({
                 href={item.href}
                 style={item.active ? { color: "#FFFFFF" } : undefined}
                 className={cn(
-                  "text-subheading uppercase tracking-widerish transition hover:text-fg",
+                  "text-base uppercase tracking-widerish transition hover:text-fg",
                   item.active ? "text-fg" : "text-muted",
                 )}
               >
@@ -185,7 +176,7 @@ export function RecruiterTopNav({
             ))}
           </nav>
 
-          <div className="relative ml-1 translate-y-[2px]">
+          <div className="relative ml-1 translate-y-[6px]">
             <button
               type="button"
               aria-label="Search events and artists"
@@ -195,7 +186,7 @@ export function RecruiterTopNav({
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
-                className="h-5 w-5"
+                className="h-5 w-5 translate-y-[2px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
