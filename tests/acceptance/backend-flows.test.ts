@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getConsumerWalletStatusForPaymentState,
   syncTicketPurchaseToEvent,
@@ -469,6 +469,7 @@ import {
 
 describe("backend acceptance flows", () => {
   beforeEach(() => {
+    vi.stubEnv("KUSPACE_DEMO_MODE", "false");
     state.role = "recruiter";
     state.recruiterProfile = buildRecruiterProfile();
     state.consumerUser = buildConsumerUser();
@@ -526,6 +527,8 @@ describe("backend acceptance flows", () => {
       },
     });
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it("covers recruiter draft creation through consumer save and purchase", async () => {
     const draftEvent = await createEventService({ slug: "harbor-opening-2030-08-01" });

@@ -1,5 +1,7 @@
 import { SignUp } from "@clerk/nextjs";
 import { isClerkConfigured } from "@/lib/auth/config";
+import { isPublicDemoMode } from "@/lib/demo-mode";
+import Link from "next/link";
 
 type SignUpPageProps = {
   searchParams?: Promise<{
@@ -8,6 +10,17 @@ type SignUpPageProps = {
 };
 
 export default async function SignUpPage({ searchParams }: SignUpPageProps) {
+  if (isPublicDemoMode()) {
+    return (
+      <main className="min-h-screen bg-bg px-4 py-12 text-fg">
+        <div className="mx-auto max-w-xl space-y-4">
+          <h1 className="text-heading">Demo registration is closed</h1>
+          <p className="text-muted">Use the supplied demonstration account to sign in. Please do not create a personal account for this portfolio demo.</p>
+          <Link className="text-accent underline" href="/login">Go to demo sign-in</Link>
+        </div>
+      </main>
+    );
+  }
   if (!isClerkConfigured()) {
     return (
       <main className="min-h-screen bg-bg px-4 py-8 text-fg md:px-6">

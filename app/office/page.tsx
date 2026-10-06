@@ -3,6 +3,7 @@ import { OfficeDashboard } from "@/components/office/office-dashboard";
 import { requireOfficeRecruiterNavigation } from "@/lib/auth/office-navigation";
 import { getCurrentAppActorService } from "@/lib/services/auth-actor-service";
 import { getCurrentWorkspaceService } from "@/lib/services/workspace-service";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 
 function getStripeConnectStatusCopy(params: {
   stripeAccountId?: string;
@@ -50,7 +51,7 @@ export default async function OfficePage() {
   const workspaceTypeLabel =
     workspace?.organization.type.replace(/_/g, " ") ?? "workspace";
   const stripeConnectStatus =
-    workspace && actor.currentOrganizationRole === "owner"
+    !isPublicDemoMode() && workspace && actor.currentOrganizationRole === "owner"
       ? getStripeConnectStatusCopy(workspace.organization)
       : null;
 

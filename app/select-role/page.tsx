@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getAuthSession } from "@/lib/auth/session";
 import { getCurrentAppActorService } from "@/lib/services/auth-actor-service";
+import { isPublicDemoMode } from "@/lib/demo-mode";
+import Link from "next/link";
 
 type SelectRolePageProps = {
   searchParams?: Promise<{
@@ -12,6 +14,23 @@ export default async function SelectRolePage({ searchParams }: SelectRolePagePro
   const session = await getAuthSession();
   const params = searchParams ? await searchParams : undefined;
   const flow = params?.flow;
+
+  if (isPublicDemoMode()) {
+    if (session.isAuthenticated) {
+      const actor = await getCurrentAppActorService();
+      if (actor.role === "recruiter") redirect(actor.needsOrganizationSetup ? "/create-organization" : "/office");
+      if (actor.role === "consumer") redirect("/conshome");
+    }
+    return (
+      <main className="min-h-screen bg-bg px-4 py-12 text-fg">
+        <div className="mx-auto max-w-xl space-y-4">
+          <h1 className="text-heading">Demo account access</h1>
+          <p className="text-muted">New account setup is closed in this portfolio demo. Use the supplied demonstration account.</p>
+          <Link className="text-accent underline" href="/login">Go to demo sign-in</Link>
+        </div>
+      </main>
+    );
+  }
 
   if (!session.isAuthenticated) {
     if (flow === "signup") {

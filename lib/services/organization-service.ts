@@ -1,4 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 import { badRequest, conflict, forbidden } from "@/lib/http/errors";
 import { requireAuthenticatedSession } from "@/lib/auth/session";
 import { getCurrentAppActorService } from "@/lib/services/auth-actor-service";
@@ -74,6 +75,9 @@ function buildRecruiterProfileSeed(params: {
 }
 
 export async function createOrganizationService(input: CreateOrganizationInput) {
+  if (isPublicDemoMode()) {
+    throw forbidden("New workspaces are closed for this portfolio demo.");
+  }
   const session = await requireAuthenticatedSession();
   const actor = await getCurrentAppActorService();
 
@@ -196,6 +200,9 @@ function buildOrganizationStripeStatusPatch(params: {
 export async function createCurrentOrganizationStripeAccountService(
   input: CreateOrganizationStripeAccountInput = {},
 ) {
+  if (isPublicDemoMode()) {
+    throw forbidden("Stripe onboarding is unavailable in this portfolio demo.");
+  }
   const { actor, organization } = await getCurrentWorkspaceService();
   if (actor.currentOrganizationRole !== "owner") {
     throw forbidden("Only workspace owners can create Stripe connected accounts.");
@@ -242,6 +249,9 @@ export async function createCurrentOrganizationStripeOnboardingLinkService(param
   requestUrl: string;
   country?: string;
 }) {
+  if (isPublicDemoMode()) {
+    throw forbidden("Stripe onboarding is unavailable in this portfolio demo.");
+  }
   const { actor, organization } = await getCurrentWorkspaceService();
 
   if (actor.currentOrganizationRole !== "owner") {
@@ -281,6 +291,9 @@ export async function createCurrentOrganizationStripeOnboardingLinkService(param
 }
 
 export async function syncCurrentOrganizationStripeAccountStatusService() {
+  if (isPublicDemoMode()) {
+    throw forbidden("Stripe onboarding is unavailable in this portfolio demo.");
+  }
   const { organization } = await getCurrentWorkspaceService();
 
   if (!organization.stripeAccountId) {

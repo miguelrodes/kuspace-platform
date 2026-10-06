@@ -34,6 +34,7 @@ import {
 
 describe("auth actor service", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     mocks.cookies.mockResolvedValue({
       get: vi.fn(() => undefined),
@@ -122,6 +123,34 @@ describe("auth actor service", () => {
       role: "consumer",
       currentConsumerUserId: "consumer-luca-dea",
       destination: "/conshome",
+    });
+  });
+
+  it("rejects new actor setup in demo mode without touching the Clerk identity", async () => {
+    vi.stubEnv("KUSPACE_DEMO_MODE", "true");
+    mocks.getActorBindingRepository.mockResolvedValue({
+      consumerUserId: null,
+      recruiterProfileId: null,
+      currentOrganizationId: null,
+      currentOrganizationRole: null,
+    });
+
+    await expect(selectCurrentAppActorService("consumer")).rejects.toMatchObject({ status: 403 });
+    expect(mocks.currentUser).not.toHaveBeenCalled();
+    expect(mocks.createOrLinkConsumerForClerkRepository).not.toHaveBeenCalled();
+  });
+
+  it("preserves existing demo recruiter access", async () => {
+    vi.stubEnv("KUSPACE_DEMO_MODE", "true");
+    mocks.getActorBindingRepository.mockResolvedValue({
+      consumerUserId: null,
+      recruiterProfileId: "recruiter-space",
+      currentOrganizationId: "organization-space",
+      currentOrganizationRole: "owner",
+    });
+
+    await expect(selectCurrentAppActorService("recruiter")).resolves.toMatchObject({
+      destination: "/office",
     });
   });
 });

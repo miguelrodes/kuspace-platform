@@ -29,6 +29,7 @@ import type { Event, TicketSection } from "@/types/event";
 type PublicEventDetailPageProps = {
   slug: string;
   audience?: "consumer" | "recruiter";
+  demoMode?: boolean;
 };
 
 function formatCurrency(value: number) {
@@ -108,9 +109,11 @@ function getRoomLineupGroups(event: Event) {
 function TicketSectionBlock({
   section,
   onPurchase,
+  demoMode,
 }: {
   section: TicketSection;
   onPurchase: (sectionId: string, phaseId: string) => void;
+  demoMode: boolean;
 }) {
   const activePhaseId = section.phases.find((phase) => phase.status === "live")?.id;
 
@@ -127,7 +130,7 @@ function TicketSectionBlock({
           const isActive = phase.id === activePhaseId;
           const isMutedPhase = phase.status !== "live";
           const showDivider = phase.id !== section.phases[section.phases.length - 1]?.id;
-          const isClickable = phase.status === "live";
+          const isClickable = phase.status === "live" && !demoMode;
 
           return (
             <button
@@ -188,6 +191,7 @@ function TicketSectionBlock({
 export function PublicEventDetailPage({
   slug,
   audience = "consumer",
+  demoMode = false,
 }: PublicEventDetailPageProps) {
   const router = useRouter();
   const {
@@ -684,11 +688,16 @@ export function PublicEventDetailPage({
                 </div>
               </div>
 
+              {demoMode ? (
+                <p className="text-body-sm text-muted">Demo only — tickets and purchases are unavailable. Prices and sales are synthetic.</p>
+              ) : null}
+
               <div className="space-y-4">
                 {visibleTicketSections.map((section) => (
                   <TicketSectionBlock
                     key={section.id}
                     section={section}
+                    demoMode={demoMode}
                     onPurchase={(sectionId, phaseId) => {
                       if (audience !== "consumer" || !currentConsumer) {
                         return;

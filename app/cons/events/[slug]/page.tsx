@@ -1,4 +1,5 @@
 import { PublicEventDetailPage } from "@/components/home/public-event-detail-page";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 
 type ConsumerEventPageProps = {
   params: Promise<{
@@ -11,5 +12,5 @@ export default async function ConsumerEventPage({
 }: ConsumerEventPageProps) {
   const { slug } = await params;
 
-  return <PublicEventDetailPage slug={slug} audience="consumer" />;
+  return <PublicEventDetailPage slug={slug} audience="consumer" demoMode={isPublicDemoMode()} />;
 }

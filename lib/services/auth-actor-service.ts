@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { currentUser } from "@clerk/nextjs/server";
-import { conflict, unauthorized } from "@/lib/http/errors";
+import { conflict, forbidden, unauthorized } from "@/lib/http/errors";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 import { getAuthSession, requireAuthenticatedSession } from "@/lib/auth/session";
 import {
   createOrLinkConsumerForClerkRepository,
@@ -101,6 +102,10 @@ export async function selectCurrentAppActorService(role: AppActorRole) {
       ...existingActor,
       destination: getActorDestination(existingActor),
     };
+  }
+
+  if (isPublicDemoMode()) {
+    throw forbidden("New account setup is closed for this portfolio demo. Use the supplied demo account.");
   }
 
   const user = await currentUser();

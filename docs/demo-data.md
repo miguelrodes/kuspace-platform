@@ -1,23 +1,9 @@
-# Demo Data and Asset Provenance
+# Public Demo Data and Asset Provenance
 
-All public demo organizations, venues, events, artists, consumers, guestlists, descriptions, contact details, and ticket records in this repository are fictional.
+The public demo combines historical 2016 venue, artist, event and lineup information with synthetic operational data. Guestlists, consumer accounts, orders, ticket sales, budgets and access records are demonstration values, not historical venue records. Some capacities and timetables are reconstructed. See `/demo-info` for the public explanation.
 
-The primary demo workspace, **Neon Harbor**, and its location, **Northport Waterfront**, do not represent a real venue or organization. Demo email addresses use the reserved `example.test` domain.
+Archived local event covers and recruiter profile images under `public/demo/original-art/` are mapped by `lib/original-art-manifest.json`. The per-file source inventory in `lib/demo-asset-sources.ts` records every distinct mapped file and the event or profile where it appears. Image-level source pages, creators/rightsholders, permission and required attribution were not retained; these facts remain unresolved. A link to an event listing is not evidence of artwork permission. Do not describe those files as original geometric artwork or as licensed assets.
 
-Artwork under `public/demo/` is original geometric SVG artwork created specifically for this repository. It does not contain downloaded posters, venue photography, artist photography, or third-party nightlife branding.
+The KUSPACE wordmark and favicon are project branding. The demo should use synthetic details in editable fields and should not be used for real bookings, tickets or payments.
 
-The KUSPACE wordmark and favicon are project branding. Third-party service names such as Clerk, Prisma, Stripe, and Vercel appear only where necessary to describe integrations or configuration.
-
-## Seed contents
-
-The seed creates one fictional organizer workspace, eight events across draft, upcoming, live, past, and cancelled states, multi-room lineups and timetables, curated applications, guestlists, budgets, ticket phases, access assignments, consumer wallet states, and ticket orders covering the supported payment lifecycle. Ticket-tier sales and normalized orders remain separate records; the seed does not duplicate tier revenue as untracked door revenue.
-
-The fictional operating date is `2030-05-15T23:30:00.000Z`. UI analytics that need a current time use the shared clock in `lib/demo-clock.ts`, keeping event status and open-ended ticket calculations deterministic regardless of the machine or deployment date.
-
-Run the seed explicitly with:
-
-```bash
-npm run prisma:seed
-```
-
-The command clears existing KUSPACE domain data before inserting the fictional records. Use it only with a dedicated development or test database, verify `DATABASE_URL` and `DIRECT_URL` first, and never point it at production. The seed is not invoked automatically during application startup.
+The public demo database is a dedicated Neon project. Seeding is destructive and must not be run as part of routine preview, policy or deployment work. This task does not seed or reset it.

@@ -457,6 +457,9 @@ export async function createCheckoutIntentService(params: {
   quantity?: number;
   provider?: CheckoutProvider;
 }) {
+  if (process.env.KUSPACE_DEMO_MODE === "true") {
+    throw conflict("Ticket purchases are unavailable in this portfolio demo.");
+  }
   const nextParams = createCheckoutIntentServiceSchema.parse(params);
   await requireOwnedConsumerUserService(nextParams.userId, "create checkout intents for");
 
@@ -672,6 +675,9 @@ export async function simulateInternalTicketPurchaseService(params: {
   sectionId: string;
   quantity?: number;
 }) {
+  if (process.env.KUSPACE_DEMO_MODE === "true") {
+    throw conflict("Ticket purchases are unavailable in this portfolio demo.");
+  }
   const nextParams = createCheckoutIntentServiceSchema.parse({
     ...params,
     provider: "internal" as const,

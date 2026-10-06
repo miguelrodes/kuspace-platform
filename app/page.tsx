@@ -1,4 +1,7 @@
+import { isPublicDemoMode } from "@/lib/demo-mode";
+
 export default function HomePage() {
+  const demoMode = isPublicDemoMode();
   return (
     <main className="min-h-screen bg-bg px-4 py-8 text-fg md:px-6">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
@@ -29,22 +32,24 @@ export default function HomePage() {
             </div>
 
             <p className="mx-auto max-w-2xl text-body text-muted">
-              Enter as a consumer to discover events and manage tickets, or create an account with a role that matches how you want to use the platform.
+              {demoMode
+                ? "Explore the historical event demo or sign in with the supplied demonstration account to inspect the two recruiter workspaces."
+                : "Enter as a consumer to discover events and manage tickets, or create an account with a role that matches how you want to use the platform."}
             </p>
 
             <div className="flex translate-y-[4px] flex-col items-center justify-center gap-1.5 pt-2">
               <a
-                href="/select-role?flow=signup"
+                href={demoMode ? "/rechome" : "/select-role?flow=signup"}
                 className="inline-flex h-11 min-w-[12rem] items-center justify-center rounded-[var(--radius-button-tag)] px-5 text-body uppercase tracking-[0.08em] transition hover:opacity-80"
                 style={{ color: "var(--accent-hex)" }}
               >
-                Create an Account
+                {demoMode ? "Explore Events" : "Create an Account"}
               </a>
               <a
                 href="/login"
                 className="inline-flex h-11 min-w-[12rem] items-center justify-center rounded-[var(--radius-button-tag)] px-5 text-body uppercase tracking-[0.08em] text-fg transition hover:opacity-80"
               >
-                Sign In
+                {demoMode ? "Demo Sign In" : "Sign In"}
               </a>
             </div>
           </div>

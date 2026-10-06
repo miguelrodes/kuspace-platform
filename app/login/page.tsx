@@ -1,5 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
 import { isClerkConfigured } from "@/lib/auth/config";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 
 export default function LoginPage() {
   if (!isClerkConfigured()) {
@@ -20,7 +21,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-bg px-4 py-8 text-fg md:px-6">
       <SignIn
         routing="hash"
-        signUpUrl="/sign-up"
+        signUpUrl={isPublicDemoMode() ? undefined : "/sign-up"}
         forceRedirectUrl="/auth/continue"
         fallbackRedirectUrl="/auth/continue"
       />
