@@ -24,6 +24,8 @@ import {
   syncTicketPurchaseToUser,
 } from "@/lib/event-access";
 import { isApiErrorPayload } from "@/lib/http/contracts";
+import { readDemoSession, requestDemoSession } from "@/lib/demo/browser-session";
+import { SandboxError } from "@/lib/demo/sandbox";
 
 type StoreMutationError = {
   message: string;
@@ -47,6 +49,13 @@ class ClientApiError extends Error {
     this.status = status;
     this.code = code;
     this.details = details;
+  }
+}
+
+class DemoSessionEntryRedirect extends Error {
+  constructor() {
+    super("Choose a demo role to start a session in this tab.");
+    this.name = "DemoSessionEntryRedirect";
   }
 }
 
@@ -168,6 +177,13 @@ async function fetchJson<T>(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<T> {
+  try {
+    const demo = requestDemoSession(String(input), init);
+    if (demo) return demo.result as T;
+  } catch (error) {
+    if (error instanceof SandboxError) throw new ClientApiError(error.message, error.status, "DEMO_SANDBOX");
+    throw error;
+  }
   const response = await fetch(input, {
     ...init,
     headers: {
@@ -181,6 +197,15 @@ async function fetchJson<T>(
 
   if (!response.ok) {
     if (isApiErrorPayload(body)) {
+      if (
+        body.error.code === "DEMO_SANDBOX" &&
+        !readDemoSession() &&
+        typeof window !== "undefined"
+      ) {
+        window.location.replace("/");
+        throw new DemoSessionEntryRedirect();
+      }
+
       throw new ClientApiError(
         body.error.message,
         body.error.status,
@@ -200,7 +225,14 @@ async function fetchJson<T>(
 }
 
 async function bootstrapFromDb() {
-  const remoteState = await fetchJson<AppStoreState>("/api/store/bootstrap");
+  let remoteState: AppStoreState;
+  try {
+    remoteState = await fetchJson<AppStoreState>("/api/store/bootstrap");
+  } catch (error) {
+    if (error instanceof DemoSessionEntryRedirect) return;
+    throw error;
+  }
+
   updateState({
     ...remoteState,
     recruiters: remoteState.recruiters?.length
@@ -284,6 +316,10 @@ async function runBackendMutation<T>({
 
   try {
     const result = await request();
+    if (readDemoSession()) {
+      await bootstrapFromDb();
+      return result;
+    }
     updateState({
       ...reconcile(storeState, result),
       mutationError: null,
@@ -513,6 +549,12 @@ async function saveEventEditorSections(update: EventEditorSectionUpdate) {
       ),
     }),
     request: async () => {
+      if (readDemoSession()) {
+        return fetchJson<Event>(`/api/store/events/${update.id}`, {
+          method: "PUT",
+          body: JSON.stringify(nextEvent),
+        });
+      }
       await fetchJson<Event>(`/api/store/events/${update.id}/cover`, {
         method: "PUT",
         body: JSON.stringify({

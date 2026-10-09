@@ -13,19 +13,6 @@ export default function RecruiterHomePage() {
 
       <main className="px-4 py-3 md:px-6">
         <div className="mx-auto max-w-7xl space-y-1.5">
-          <header className="space-y-0.5">
-            <h1
-              className="text-heading !font-normal uppercase"
-              style={{
-                color: "var(--accent-hex)",
-                fontFamily: "var(--font-space-grotesk)",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Events
-            </h1>
-          </header>
-
           <HomeFeed
             events={discoveryEvents}
             recruiter={profile}

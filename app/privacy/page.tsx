@@ -15,7 +15,7 @@ export default function PrivacyPage() {
         <p>An email address or other information submitted through a sign-in flow may also be processed by the authentication provider. Use the supplied demo account rather than your personal credentials.</p>
       </LegalSection>
       <LegalSection title="Information you enter">
-        <p>Information entered into demonstration forms, including guest names, profile/contact fields and uploaded images, may be stored in the demo database and visible to other visitors using the same workspace. Do not enter personal or confidential information.</p>
+        <p>In the one-click organiser and clubgoer demos, form edits stay in your browser tab&apos;s session storage and are not saved to the shared database. Reset demo restores the original synthetic data. Separate authenticated management sessions may save changes to the shared database. Use fictional details only; do not enter personal or confidential information.</p>
         <p>If you contact me by email, I receive your email address and the contents of your message to handle your enquiry.</p>
       </LegalSection>
       <LegalSection title="Purposes and proposed lawful basis">

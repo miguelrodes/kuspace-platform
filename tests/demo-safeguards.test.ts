@@ -11,10 +11,17 @@ import PrivacyPage from "@/app/privacy/page";
 import CookiesPage from "@/app/cookies/page";
 import HomePage from "@/app/page";
 import SignUpPage from "@/app/sign-up/page";
+import { updateRecruiterProfileService } from "@/lib/services/recruiter-service";
 
 afterEach(() => vi.unstubAllEnvs());
 
 describe("public demo safeguards", () => {
+  it("rejects recruiter profile changes before accessing persistence in demo mode", async () => {
+    vi.stubEnv("KUSPACE_DEMO_MODE", "true");
+    await expect(updateRecruiterProfileService({} as Parameters<typeof updateRecruiterProfileService>[0]))
+      .rejects.toMatchObject({ status: 403, message: "Recruiter profile settings are not available in demo mode." });
+  });
+
   it("renders the exact shared notice, public legal pages, and footer links without auth", () => {
     const notice = renderToStaticMarkup(createElement(DemoDisclosure));
     const footer = renderToStaticMarkup(createElement(SiteFooter));
@@ -40,7 +47,8 @@ describe("public demo safeguards", () => {
     const home = renderToStaticMarkup(createElement(HomePage));
     const signup = renderToStaticMarkup(await SignUpPage({}));
 
-    expect(home).toContain("Explore Events");
+    expect(home).toContain("Explore as a nightclub / event label");
+    expect(home).toContain("Explore as a clubgoer");
     expect(home).not.toContain("Create an Account");
     expect(signup).toContain("Demo registration is closed");
     expect(signup).toContain('href="/login"');

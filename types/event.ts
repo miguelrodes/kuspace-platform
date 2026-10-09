@@ -209,9 +209,22 @@ export type TicketSection = {
   >;
 };
 
+export type TicketSalesHistory = {
+  source: "synthetic-demo";
+  version: 1;
+  startsAt: string;
+  bucketHours: number;
+  phases: Array<{
+    sectionId: string;
+    phaseId: string;
+    quantities: number[];
+  }>;
+};
+
 export type EventTicketsSection = {
   tiers: TicketTier[];
   sections?: TicketSection[];
+  salesHistory?: TicketSalesHistory;
 };
 
 export type EventLabel = {

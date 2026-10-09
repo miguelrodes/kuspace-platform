@@ -24,13 +24,13 @@ export function OfficeEventList({
 }: OfficeEventListProps) {
   return (
     <section className="space-y-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="office-content-reveal office-event-controls-reveal flex flex-wrap items-end justify-between gap-4">
         <OfficeEventTabs activeTab={activeTab} onChange={onTabChange} />
 
-        <Link href="/office/event-editor/new">
+        <Link href="/office/event-editor/new" className="inline-flex items-end">
           <Button
             variant="ghost"
-            className="h-8 px-4 text-heading uppercase tracking-[0.14em]"
+            className="h-auto px-4 pt-0 pb-1 text-body leading-[var(--text-base-line-height)] uppercase tracking-[0.14em]"
             style={{ color: "var(--accent-hex)" }}
           >
             NEW EVENT
@@ -39,13 +39,14 @@ export function OfficeEventList({
       </div>
 
       {events.length === 0 ? (
-        <p className="text-body-sm text-muted">No events in this section.</p>
+        <p className="office-content-reveal office-card-reveal text-body-sm text-muted">No events in this section.</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {events.map((event) => (
+          {events.map((event, index) => (
             <OfficeEventRow
               key={event.id}
               event={event}
+              revealIndex={index}
             />
           ))}
         </div>

@@ -206,12 +206,6 @@ export function TicketTierCard({
   return (
     <section className="w-full max-w-full min-w-0 overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel px-4 pt-1 pb-4">
       <div className="w-full max-w-full min-w-0 space-y-3">
-        {!editableSection ? (
-          <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-2 text-body-sm text-[#facc15]">
-            Ticket section settings are read-only for this event status.
-          </div>
-        ) : null}
-
         <div className="relative h-0">
           <div className="absolute right-0 top-0">
           <SectionActionMenu canDelete={canDeleteSection} onDelete={onRemoveSection} />

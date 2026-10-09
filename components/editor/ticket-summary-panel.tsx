@@ -4,9 +4,12 @@ import { useMemo, useState } from "react";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import type { TicketSectionDraft } from "@/components/editor/ticket-tier-card";
 import { getDemoReferenceNow } from "@/lib/demo-clock";
+import type { TicketSalesHistory } from "@/types/event";
+import { buildTicketSalesSeries } from "@/lib/ticket-sales-series";
 
 type TicketSummaryPanelProps = {
   sections: TicketSectionDraft[];
+  salesHistory?: TicketSalesHistory;
 };
 
 type TimeWindow = "full" | "24h";
@@ -79,10 +82,9 @@ function computeTicketsPerHour(sold: number, salesStart?: string, salesEnd?: str
   return Number((sold / hours).toFixed(1));
 }
 
-function buildLinePath(points: number[], width: number, height: number) {
+function buildLinePath(points: number[], width: number, height: number, max: number) {
   if (points.length === 0) return "";
 
-  const max = Math.max(...points, 1);
   const stepX = points.length === 1 ? 0 : width / (points.length - 1);
 
   return points
@@ -207,19 +209,22 @@ function SummaryChart({
   const chartLeft = 40;
   const chartRight = 14;
   const chartWidth = width - chartLeft - chartRight;
+  const scaleFloor = title === "Ticket Velocity" ? 0.01 : 1;
+  const max = Math.max(...points.map((point) => point.value), scaleFloor);
   const path = buildLinePath(
     points.map((point) => point.value),
     chartWidth,
     height,
+    max,
   );
-  const max = Math.max(...points.map((point) => point.value), 1);
+  const tickPrecision = max < 1 ? 2 : 1;
   const yTicks = [max, max * 0.75, max * 0.5, max * 0.25, 0].map((value) =>
-    Number(value.toFixed(1)),
+    Number(value.toFixed(tickPrecision)),
   );
 
   return (
-    <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="min-w-0 rounded-[var(--radius-surface)] border border-border bg-panel p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-body uppercase tracking-widerish text-fg">{title}</p>
           <p className="mt-1 text-body-sm text-[#9aa1b2]">{valueLabel}</p>
@@ -229,7 +234,12 @@ function SummaryChart({
 
       <div className="mt-4 overflow-x-auto">
         <div className="min-w-[34rem]">
-          <svg viewBox={`0 0 ${width} ${height + 28}`} className="h-[14rem] w-full">
+          <svg
+            viewBox={`0 0 ${width} ${height + 28}`}
+            className="h-[14rem] w-full"
+            role="img"
+            aria-label={`${title}, ${window === "full" ? "full cycle" : "last 24 hours"}`}
+          >
             <line
               x1={chartLeft}
               y1={height}
@@ -269,10 +279,13 @@ function SummaryChart({
               const y = height - (point.value / max) * height;
               const textAnchor =
                 index === 0 ? "start" : index === points.length - 1 ? "end" : "middle";
+              const showLabel = index % Math.ceil(points.length / 6) === 0 || index === points.length - 1;
               return (
                 <g key={`${title}-${point.timestamp}-${index}`}>
-                  <circle cx={x} cy={y} r="4" fill="var(--accent-hex)" />
-                  <text
+                  <circle cx={x} cy={y} r="3" fill="var(--accent-hex)">
+                    <title>{`${new Date(point.timestamp).toISOString()}: ${Number(point.value.toFixed(2))} ${valueLabel.toLowerCase()}`}</title>
+                  </circle>
+                  {showLabel ? <text
                     x={x}
                     y={height + 18}
                     textAnchor={textAnchor}
@@ -280,7 +293,7 @@ function SummaryChart({
                     fontSize={window === "24h" ? "10" : "12"}
                   >
                     {point.label}
-                  </text>
+                  </text> : null}
                 </g>
               );
             })}
@@ -293,7 +306,7 @@ function SummaryChart({
   );
 }
 
-export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
+export function TicketSummaryPanel({ sections, salesHistory }: TicketSummaryPanelProps) {
   const [ticketsWindow, setTicketsWindow] = useState<TimeWindow>("full");
   const [velocityWindow, setVelocityWindow] = useState<TimeWindow>("full");
   const normalizedPhases = useMemo<NormalizedPhaseMetrics[]>(
@@ -352,7 +365,9 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         ),
     );
     const nonZeroVelocities = velocityValues.filter((value) => value > 0);
-    const averageVelocity = nonZeroVelocities.length
+    const averageVelocity = salesHistory
+      ? buildTicketSalesSeries(salesHistory, "24h").at(-1)?.velocity ?? 0
+      : nonZeroVelocities.length
       ? Number(
           (
             nonZeroVelocities.reduce((sum, value) => sum + value, 0) / nonZeroVelocities.length
@@ -377,7 +392,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
       averageVelocity,
       averageTicketPrice,
     };
-  }, [normalizedPhases]);
+  }, [normalizedPhases, salesHistory]);
 
   const sectionPerformance = useMemo(() => {
     return sections.map((section) => {
@@ -394,24 +409,22 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         (sum, phase) => sum + phase.price * phase.quantitySold,
         0,
       );
+      const livePhase = sectionPhases.find((phase) => phase.status === "live");
       const velocityValues = sectionPhases
         .map((phase) =>
-          computeTicketsPerHour(
-            phase.quantitySold,
-            phase.salesStart,
-            phase.salesEnd,
-          ),
+          computeTicketsPerHour(phase.quantitySold, phase.salesStart, phase.salesEnd),
         )
         .filter((value) => value > 0);
-      const velocity = velocityValues.length
+      const velocity = salesHistory
+        ? buildTicketSalesSeries(salesHistory, "24h", section.id).at(-1)?.velocity ?? 0
+        : velocityValues.length
         ? Number(
             (
               velocityValues.reduce((sum, value) => sum + value, 0) / velocityValues.length
-            ).toFixed(1),
+            ).toFixed(livePhase ? 2 : 1),
           )
         : 0;
 
-      const livePhase = sectionPhases.find((phase) => phase.status === "live");
       const upcomingPhase = sectionPhases.find((phase) => phase.status === "upcoming");
       const statusLabel = livePhase
         ? livePhase.phaseName
@@ -425,10 +438,11 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         percentSold: capacity > 0 ? Math.round((sold / capacity) * 100) : 0,
         revenue,
         velocity,
+        hasLivePhase: Boolean(livePhase),
         statusLabel,
       };
     });
-  }, [phasesBySection, sections]);
+  }, [phasesBySection, sections, salesHistory]);
 
   const boundaryTimestamps = useMemo(() => {
     return normalizedPhases
@@ -475,23 +489,25 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
       const totalVelocity = normalizedPhases.reduce(
         (sum, phase) =>
           sum +
-          phaseRateAtTime(
-            phase.quantitySold,
-            phase.salesStart,
-            phase.salesEnd,
-            timestamp,
-          ),
+          phaseRateAtTime(phase.quantitySold, phase.salesStart, phase.salesEnd, timestamp),
         0,
       );
       return {
         label: formatAxisLabel(timestamp),
         timestamp,
-        value: Number(totalVelocity.toFixed(1)),
+        value: Number(totalVelocity.toFixed(2)),
       };
     });
   }, [anchorTimestamp, boundaryTimestamps, normalizedPhases]);
 
   const visibleTicketsSoldPoints = useMemo(() => {
+    if (salesHistory) {
+      return buildTicketSalesSeries(salesHistory, ticketsWindow).map((point) => ({
+        timestamp: point.timestamp,
+        label: ticketsWindow === "24h" ? formatHourlyAxisLabel(point.timestamp) : formatAxisLabel(point.timestamp),
+        value: point.sold,
+      }));
+    }
     if (ticketsWindow === "full") {
       return ticketsSoldPoints;
     }
@@ -517,9 +533,16 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
         ),
       ),
     }));
-  }, [anchorTimestamp, normalizedPhases, ticketsSoldPoints, ticketsWindow]);
+  }, [anchorTimestamp, normalizedPhases, ticketsSoldPoints, ticketsWindow, salesHistory]);
 
   const visibleVelocityPoints = useMemo(() => {
+    if (salesHistory) {
+      return buildTicketSalesSeries(salesHistory, velocityWindow).map((point) => ({
+        timestamp: point.timestamp,
+        label: velocityWindow === "24h" ? formatHourlyAxisLabel(point.timestamp) : formatAxisLabel(point.timestamp),
+        value: point.velocity,
+      }));
+    }
     if (velocityWindow === "full") {
       return velocityPoints;
     }
@@ -532,21 +555,16 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
       const totalVelocity = normalizedPhases.reduce(
         (sum, phase) =>
           sum +
-          phaseRateAtTime(
-            phase.quantitySold,
-            phase.salesStart,
-            phase.salesEnd,
-            timestamp,
-          ),
+          phaseRateAtTime(phase.quantitySold, phase.salesStart, phase.salesEnd, timestamp),
         0,
       );
       return {
         label: formatHourlyAxisLabel(timestamp),
         timestamp,
-        value: Number(totalVelocity.toFixed(1)),
+        value: Number(totalVelocity.toFixed(2)),
       };
     });
-  }, [anchorTimestamp, normalizedPhases, velocityPoints, velocityWindow]);
+  }, [anchorTimestamp, normalizedPhases, velocityPoints, velocityWindow, salesHistory]);
 
   return (
     <div className="space-y-6">
@@ -579,7 +597,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
           {sectionPerformance.map((section) => (
             <div
               key={section.id}
-              className="w-[16rem] max-w-[16rem] min-w-[16rem] rounded-[var(--radius-surface)] border border-border bg-panel px-4 py-2"
+              className="w-[16rem] max-w-full min-w-0 rounded-[var(--radius-surface)] border border-border bg-panel px-4 py-2"
             >
               <div className="space-y-1">
                 <div className="border-b border-border pb-1">
@@ -598,7 +616,9 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
                   </div>
                   <div className="flex items-baseline justify-between gap-4">
                     <p className="text-body text-muted">Velocity</p>
-                    <p className="text-body text-fg">{formatTicketsPerHour(section.velocity)}</p>
+                    <p className="text-body text-fg">
+                      {section.velocity.toFixed(section.hasLivePhase ? 2 : 1)} T/h
+                    </p>
                   </div>
                   <div className="flex items-baseline justify-between gap-4">
                     <p className="text-body text-muted">Status</p>
@@ -622,6 +642,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
             control={
               <DropdownSelect
                 value={ticketsWindow}
+                ariaLabel="Tickets sold time range"
                 options={[
                   { value: "full", label: "Full Cycle" },
                   { value: "24h", label: "Last 24h" },
@@ -640,6 +661,7 @@ export function TicketSummaryPanel({ sections }: TicketSummaryPanelProps) {
             control={
               <DropdownSelect
                 value={velocityWindow}
+                ariaLabel="Ticket velocity time range"
                 options={[
                   { value: "full", label: "Full Cycle" },
                   { value: "24h", label: "Last 24h" },

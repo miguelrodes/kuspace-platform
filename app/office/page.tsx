@@ -47,7 +47,6 @@ export default async function OfficePage() {
       ? await getCurrentWorkspaceService()
       : null;
 
-  const workspaceName = workspace?.organization.name ?? "Back Office";
   const workspaceTypeLabel =
     workspace?.organization.type.replace(/_/g, " ") ?? "workspace";
   const stripeConnectStatus =
@@ -57,14 +56,9 @@ export default async function OfficePage() {
 
   return (
     <OfficeShell
-      eyebrow={workspace ? "Current Workspace" : ""}
-      title={workspaceName}
-      titleClassName="text-heading !font-normal"
-      titleStyle={{
-        color: "var(--accent-hex)",
-        fontFamily: "var(--font-space-grotesk)",
-        letterSpacing: "0.06em",
-      }}
+      eyebrow=""
+      title=""
+      descriptionClassName="office-content-reveal"
       descriptionStyle={{ color: "#FFFFFF" }}
       description={
         workspace
@@ -73,7 +67,7 @@ export default async function OfficePage() {
       }
     >
       {stripeConnectStatus ? (
-        <section className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.18)] backdrop-blur">
+        <section className="office-content-reveal mb-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.18)] backdrop-blur">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-3xl space-y-2">
               <p

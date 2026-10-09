@@ -4,6 +4,7 @@ import { forbidden } from "@/lib/http/errors";
 import { recruiterProfileSchema } from "@/lib/validation/store";
 import { saveRecruiterRepository } from "@/lib/db/repositories/recruiter-repository";
 import { requireCurrentRecruiterProfileService } from "@/lib/services/access-service";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 
 function normalizeRecruiterProfileInput(profile: RecruiterProfileInput): RecruiterProfile {
   return {
@@ -13,6 +14,9 @@ function normalizeRecruiterProfileInput(profile: RecruiterProfileInput): Recruit
 }
 
 export async function updateRecruiterProfileService(profile: RecruiterProfileInput) {
+  if (isPublicDemoMode()) {
+    throw forbidden("Recruiter profile settings are not available in demo mode.");
+  }
   const nextProfile = normalizeRecruiterProfileInput(recruiterProfileSchema.parse(profile));
   const { profile: currentProfile } = await requireCurrentRecruiterProfileService();
 

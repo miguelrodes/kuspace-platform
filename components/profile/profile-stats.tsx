@@ -55,7 +55,7 @@ export function ProfileStats({ profile }: ProfileStatsProps) {
         >
           Sound Profile
         </p>
-        <div className="flex flex-wrap items-start gap-2 pl-0">
+        <div className="profile-content-reveal profile-sound-reveal flex flex-wrap items-start gap-2 pl-0">
           {soundProfile?.genres.map((genre) => (
             <MetaTag key={genre}>{genre}</MetaTag>
           ))}
@@ -69,7 +69,7 @@ export function ProfileStats({ profile }: ProfileStatsProps) {
         >
           Rooms
         </p>
-        <div className="text-body-sm text-muted space-y-1">
+        <div className="profile-content-reveal profile-rooms-reveal text-body-sm text-muted space-y-1">
           {soundProfile?.rooms?.map((room) => (
             <div
               key={room.name}
@@ -94,7 +94,7 @@ export function ProfileStats({ profile }: ProfileStatsProps) {
         >
           Links
         </p>
-        <div className="text-body text-muted space-y-1">
+        <div className="profile-content-reveal profile-links-reveal text-body text-muted space-y-1">
           {links?.instagram ? (
             <Link
               href={links.instagram}

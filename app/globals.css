@@ -56,6 +56,165 @@ body {
   line-height: 1.45;
 }
 
+.site-header-divider {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 0;
+}
+
+.site-header-divider::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1.5px;
+  background-color: hsl(var(--border));
+  content: "";
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.site-header-divider[data-header-intro="true"]::after {
+  animation: header-divider-reveal 600ms cubic-bezier(0.22, 1, 0.36, 1) 200ms backwards;
+}
+
+.site-header-divider[data-header-intro="true"] .site-header-content {
+  animation: header-content-reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.office-content-reveal {
+  animation: content-fade-in var(--office-fade-duration, 700ms) cubic-bezier(0.25, 0.1, 0.25, 1) var(--office-fade-delay, 0ms) backwards;
+}
+
+.office-calendar-controls-reveal {
+  --office-fade-duration: 560ms;
+  --office-fade-delay: 40ms;
+}
+
+.office-weekdays-reveal {
+  --office-fade-duration: 600ms;
+  --office-fade-delay: 140ms;
+}
+
+.office-day-reveal {
+  --office-fade-duration: 800ms;
+}
+
+.office-event-controls-reveal {
+  --office-fade-duration: 600ms;
+  --office-fade-delay: 260ms;
+}
+
+.office-card-reveal {
+  --office-fade-duration: 780ms;
+  --office-fade-delay: 340ms;
+}
+
+.profile-content-reveal {
+  animation: content-fade-in var(--profile-fade-duration, 700ms) cubic-bezier(0.25, 0.1, 0.25, 1) var(--profile-fade-delay, 0ms) backwards;
+}
+
+.profile-name-reveal {
+  --profile-fade-duration: 560ms;
+}
+
+.profile-location-reveal {
+  --profile-fade-duration: 650ms;
+  --profile-fade-delay: 80ms;
+}
+
+.profile-bio-reveal {
+  --profile-fade-duration: 850ms;
+  --profile-fade-delay: 160ms;
+}
+
+.profile-sound-reveal {
+  --profile-fade-duration: 600ms;
+  --profile-fade-delay: 220ms;
+}
+
+.profile-rooms-reveal {
+  --profile-fade-duration: 650ms;
+  --profile-fade-delay: 300ms;
+}
+
+.profile-links-reveal {
+  --profile-fade-duration: 600ms;
+  --profile-fade-delay: 380ms;
+}
+
+.profile-card-reveal {
+  --profile-fade-duration: 780ms;
+}
+
+.profile-artist-reveal {
+  --profile-fade-duration: 500ms;
+}
+
+.home-event-card-reveal {
+  min-width: 0;
+  animation: home-event-card-fade-in 1100ms cubic-bezier(0.25, 0.1, 0.25, 1) backwards;
+}
+
+@keyframes header-divider-reveal {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes header-content-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes home-event-card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header-divider[data-header-intro="true"]::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  .home-event-card-reveal,
+  .site-header-divider[data-header-intro="true"] .site-header-content,
+  .office-content-reveal,
+  .profile-content-reveal {
+    animation: none;
+  }
+}
+
 * {
   box-sizing: border-box;
   border-color: hsl(var(--border));

@@ -9,9 +9,10 @@ import { useAppStore } from "@/lib/app-store";
 
 type OfficeEventRowProps = {
   event: Event;
+  revealIndex?: number;
 };
 
-export function OfficeEventRow({ event }: OfficeEventRowProps) {
+export function OfficeEventRow({ event, revealIndex = 0 }: OfficeEventRowProps) {
   const router = useRouter();
   const { deleteEvent } = useAppStore();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -34,6 +35,8 @@ export function OfficeEventRow({ event }: OfficeEventRowProps) {
   return (
     <>
       <EventCard
+        className="office-content-reveal office-card-reveal"
+        style={{ animationDelay: `${340 + Math.min(revealIndex * 65, 260)}ms` }}
         variant="large"
         imageUrl={event.cover.imageUrl}
         imageAlt={event.cover.imageAlt}

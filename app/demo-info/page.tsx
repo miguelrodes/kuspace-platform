@@ -19,7 +19,7 @@ export default function DemoInfoPage() {
         <p>KUSPACE is not affiliated with, endorsed by, or operated on behalf of Space Ibiza, DC10, Circoloco, Paradise, Resident Advisor, or any other venue, artist or event brand shown.</p>
       </LegalSection>
       <LegalSection title="Using the demo">
-        <p>Use the supplied demonstration account where sign-in is required. Do not enter real guest information, personal contact details, payment-card details or confidential information.</p>
+        <p>Choose the organiser or clubgoer demo on the start page; no account is required. Edits stay in your tab and Reset demo restores the starting data. Luca Dea is a display persona with fictional account activity, not access to a real person&apos;s account. Do not enter real guest information, personal contact details, payment-card details or confidential information.</p>
         <p>Demo workspaces are shared. Information entered into them may be visible to other visitors and may be changed or reset. Do not rely on the demo to retain information or operate a real event.</p>
       </LegalSection>
       <LegalSection title="Sources and artwork">

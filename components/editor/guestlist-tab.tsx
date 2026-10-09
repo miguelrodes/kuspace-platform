@@ -172,7 +172,7 @@ function AddGuestModal({
         </div>
 
         <div className="mt-4 space-y-4">
-          <p className="text-body-sm text-muted">Use fictional details only. This is a shared demo workspace; changes may be visible to other visitors.</p>
+          <p className="text-body-sm text-muted">Use fictional details only. One-click demo edits stay in your tab; separate signed-in workspace edits may be shared.</p>
           <div>
             <label className={DIALOG_FIELD_LABEL_CLASS}>First Name</label>
             <Input
@@ -542,7 +542,7 @@ export function GuestlistTab({
               </>
             }
           />
-          <p className="text-body-sm text-muted">Use fictional details only. This is a shared demo workspace; changes may be visible to other visitors.</p>
+          <p className="text-body-sm text-muted">Use fictional details only. One-click demo edits stay in your tab; separate signed-in workspace edits may be shared.</p>
           {admissionMode === "curated" ? (
             <div className="rounded-[var(--radius-surface)] border border-border bg-panel p-4">
               <div className="space-y-3">

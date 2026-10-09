@@ -1,7 +1,8 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { DJNetworkPanel } from "@/components/profile/dj-network-panel";
 import { ProfileEventsPanel } from "@/components/profile/profile-events-panel";
 import { ProfileHero } from "@/components/profile/profile-hero";
@@ -9,7 +10,6 @@ import { ProfileSidebarCard } from "@/components/profile/profile-sidebar-card";
 import { ProfileStats } from "@/components/profile/profile-stats";
 import { PublicTopNav } from "@/components/layout/public-top-nav";
 import { RecruiterTopNav } from "@/components/layout/recruiter-top-nav";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { useAppStore } from "@/lib/app-store";
@@ -72,7 +72,13 @@ export function RecruiterProfilePageView({
   audience = "recruiter",
 }: RecruiterProfilePageViewProps) {
   const { signOut } = useClerk();
-  const { profile: activeProfile, recruiters, updateProfile } = useAppStore();
+  const router = useRouter();
+  const {
+    profile: activeProfile,
+    recruiters,
+    updateProfile,
+    switchOrganization,
+  } = useAppStore();
   const profile = recruiters.find((candidate) => candidate.slug === slug) ??
     (activeProfile.slug === slug ? activeProfile : null);
   const canManageProfile = Boolean(
@@ -83,11 +89,52 @@ export function RecruiterProfilePageView({
   );
   const [isEditing, setIsEditing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState("");
+  const [switchingPerspective, setSwitchingPerspective] = useState(false);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
+  }, []);
   const hasHydrated = useSyncExternalStore(
     () => () => {},
     () => true,
     () => false,
   );
+  const isDemoMode = hasHydrated && document.documentElement.dataset.publicDemo === "true";
+  const perspectiveOrder = ["space-ibiza", "dc10-ibiza"];
+  const demoPerspectives = recruiters
+    .filter((candidate) => perspectiveOrder.includes(candidate.slug))
+    .sort(
+      (left, right) =>
+        perspectiveOrder.indexOf(left.slug) - perspectiveOrder.indexOf(right.slug),
+    );
+  const showDemoPerspectiveSwitcher =
+    canManageProfile && isDemoMode && demoPerspectives.length > 1;
+
+  async function handlePerspectiveChange(nextProfile: (typeof demoPerspectives)[number]) {
+    if (switchingPerspective || !nextProfile.organizationId) return;
+    setSwitchingPerspective(true);
+    const changed =
+      nextProfile.organizationId === activeProfile.organizationId ||
+      (await switchOrganization(nextProfile.organizationId));
+    if (changed) router.push(`/recprofile/${nextProfile.slug}`);
+    setSwitchingPerspective(false);
+  }
+
+  function handleSettingsClick() {
+    if (!isDemoMode) {
+      setSettingsOpen(true);
+      return;
+    }
+    setSettingsOpen(false);
+    setIsEditing(false);
+    setSettingsNotice("Not available in demo mode.");
+    if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => {
+      setSettingsNotice("");
+      noticeTimer.current = null;
+    }, 2000);
+  }
   const publicUpcomingEvents = useMemo(
     () =>
       getPublicEventCollection(profile?.events?.upcoming ?? []).filter(
@@ -155,14 +202,16 @@ export function RecruiterProfilePageView({
       )}
 
       <main className="px-4 py-8 md:px-6">
-        <div className="mx-auto grid max-w-[88rem] grid-cols-[minmax(0,1fr)_minmax(0,72rem)_minmax(0,1fr)] items-start">
-          <div />
+        <div className={`mx-auto ${showDemoPerspectiveSwitcher ? "max-w-[86rem]" : "max-w-[72rem]"}`}>
+          <div className={showDemoPerspectiveSwitcher ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_12rem]" : "w-full"}>
+          <section key={profile.id} className="overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel">
+            <ProfileHero
+              profile={profile}
+              onSettingsClick={canManageProfile ? handleSettingsClick : undefined}
+              settingsNotice={settingsNotice}
+            />
 
-          <div className="relative">
-          <section className="overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel">
-            <ProfileHero profile={profile} />
-
-            <div className="grid xl:grid-cols-[13.5rem_minmax(0,1fr)_14rem] border-t border-border">
+            <div className="grid border-t border-border xl:grid-cols-[13.5rem_minmax(0,1fr)_14rem]">
               <div className="xl:border-r xl:border-border">
                 <ProfileSidebarCard>
                   <ProfileStats profile={profile} />
@@ -171,7 +220,7 @@ export function RecruiterProfilePageView({
 
               <div className="min-w-0 xl:border-r xl:border-border">
                 <div className="px-4 py-4">
-                  {isEditing && canManageProfile ? (
+                  {isEditing && canManageProfile && !isDemoMode ? (
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
                         <label className="text-body uppercase tracking-widerish text-fg">Display Name</label>
@@ -258,7 +307,7 @@ export function RecruiterProfilePageView({
                       </div>
                     </div>
                   ) : (
-                    <p className="text-body text-fg">{profile.bio}</p>
+                    <p className="profile-content-reveal profile-bio-reveal text-body text-fg">{profile.bio}</p>
                   )}
                 </div>
 
@@ -280,25 +329,39 @@ export function RecruiterProfilePageView({
               </div>
             </div>
           </section>
-          </div>
-
-          {canManageProfile ? (
-            <div className="flex items-start justify-start pl-4 pt-0">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-10 px-0 text-[13px] uppercase tracking-[0.16em] !text-[var(--accent-hex)] hover:bg-transparent hover:!text-[var(--accent-hex)]/85"
-                onClick={() => setSettingsOpen(true)}
-                style={{ color: "var(--accent-hex)" }}
+          {showDemoPerspectiveSwitcher ? (
+            <aside className="flex flex-col items-start gap-2 pt-1">
+              <span className="text-xs text-muted">Demo Perspective:</span>
+              <div
+                role="group"
+                aria-label="Switch recruiter demo perspective"
+                className="flex flex-col items-start gap-2 text-sm uppercase tracking-widerish"
               >
-                Settings
-              </Button>
-            </div>
+                {demoPerspectives.map((candidate) => {
+                  const isActive = candidate.organizationId === activeProfile.organizationId;
+                  return (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      disabled={switchingPerspective}
+                      onClick={() => void handlePerspectiveChange(candidate)}
+                      className={`transition disabled:opacity-50 ${
+                        isActive ? "text-fg" : "text-muted hover:text-fg"
+                      }`}
+                    >
+                      {candidate.displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
           ) : null}
+          </div>
         </div>
       </main>
 
-      {settingsOpen ? (
+      {settingsOpen && !isDemoMode ? (
         <RecruiterSettingsModal
           onClose={() => setSettingsOpen(false)}
           onEditProfile={() => {

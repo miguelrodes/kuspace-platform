@@ -9,6 +9,7 @@ import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
 import { useAppStore } from "@/lib/app-store";
+import { useHeaderEntrance } from "@/components/layout/use-header-entrance";
 
 type PublicTopNavProps = {
   title?: string;
@@ -20,6 +21,7 @@ export function PublicTopNav({
   subtitle = "Public Event Network",
 }: PublicTopNavProps) {
   const pathname = usePathname();
+  const headerRef = useHeaderEntrance(pathname, "/conshome");
   const router = useRouter();
   const { events, profile, mutationError, clearMutationError } = useAppStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -85,13 +87,13 @@ export function PublicTopNav({
   );
 
   return (
-    <header className="border-b border-border bg-panel px-4 pb-2 pt-3 md:px-6">
-      <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-2 md:items-end">
+    <header ref={headerRef} className="site-header-divider bg-panel px-4 pb-4 pt-4 md:px-6 md:pb-3">
+      <div className="site-header-content mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-2 md:items-end">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/conshome" aria-label="Go to home">
+          <Link href="/" aria-label="Go to home">
             <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
           </Link>
-          <Link href="/conshome" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
+          <Link href="/" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
             <img
               src="/title-logo.svg"
               alt="KUSPACE"
@@ -103,7 +105,7 @@ export function PublicTopNav({
         <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-0">
           <nav
             aria-label="Public navigation"
-            className="ml-5 flex items-center gap-7 text-subheading text-muted md:ml-4 md:gap-8"
+            className="ml-5 flex translate-y-[6px] items-center gap-7 text-base text-muted md:ml-4 md:gap-8"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             {navItems.map((item) => (
@@ -112,7 +114,7 @@ export function PublicTopNav({
                 href={item.href}
                 style={item.active ? { color: "#FFFFFF" } : undefined}
                 className={cn(
-                  "text-subheading uppercase tracking-widerish transition hover:text-fg",
+                  "text-base uppercase tracking-widerish transition hover:text-fg",
                   item.active ? "text-fg" : "text-muted",
                 )}
               >
@@ -121,7 +123,7 @@ export function PublicTopNav({
             ))}
           </nav>
 
-          <div className="relative ml-1 translate-y-[2px]">
+          <div className="relative ml-1 translate-y-[6px]">
             <button
               type="button"
               aria-label="Search events and recruiters"
@@ -131,7 +133,7 @@ export function PublicTopNav({
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
-                className="h-5 w-5"
+                className="h-5 w-5 translate-y-[2px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"

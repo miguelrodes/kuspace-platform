@@ -61,7 +61,7 @@ export function FilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="-ml-2 flex flex-wrap items-center gap-3">
+      <div className="-ml-6 flex flex-wrap items-center gap-3 md:-ml-10">
         <DropdownSelect
           value={date}
           options={dateDropdownOptions}
@@ -93,14 +93,17 @@ export function FilterBar({
         />
       </div>
 
-      <div className="ml-auto translate-x-2 inline-flex items-center gap-2">
+      <div
+        className="ml-auto translate-x-6 inline-flex items-center gap-2 md:translate-x-10"
+        style={{ fontFamily: "var(--font-space-grotesk)" }}
+      >
         {statusOptions.map((option, index) => {
           const isActive = status === option.value;
 
           return (
             <div key={option.value} className="inline-flex items-end gap-2">
               {index > 0 ? (
-                <span className="pb-[1px] text-lg uppercase tracking-widerish leading-none text-white">
+                <span className="pb-[1px] text-body-sm uppercase tracking-widerish leading-none text-white">
                   |
                 </span>
               ) : null}
@@ -108,7 +111,7 @@ export function FilterBar({
                 type="button"
                 onClick={() => onStatusChange(option.value)}
                 className={[
-                  "h-auto rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-lg uppercase tracking-widerish leading-none transition",
+                  "h-auto rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-body-sm uppercase tracking-widerish leading-none transition",
                   isActive
                     ? "bg-transparent text-white"
                     : "text-muted hover:text-fg",

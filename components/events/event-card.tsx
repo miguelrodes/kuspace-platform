@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { EventPoster } from "@/components/home/event-poster";
 import {
   eventCardVariants,
   type EventCardVariant,
 } from "@/components/office/event-card-variants";
 import { formatCompactEventDate } from "@/lib/utils/date";
+import { cn } from "@/lib/utils/index";
 
 type EventCardProps = {
   variant: Exclude<EventCardVariant, "compact">;
@@ -20,6 +22,8 @@ type EventCardProps = {
   topRightSlot?: React.ReactNode;
   footer?: React.ReactNode;
   hrefMode?: "wrap" | "overlay";
+  className?: string;
+  style?: CSSProperties;
 };
 
 const twoLineClampStyle = {
@@ -40,6 +44,8 @@ export function EventCard({
   topRightSlot,
   footer,
   hrefMode = "wrap",
+  className,
+  style,
 }: EventCardProps) {
   const styles = eventCardVariants[variant];
   const useOverlayLink = hrefMode === "overlay" && Boolean(href);
@@ -56,8 +62,14 @@ export function EventCard({
         />
       ) : null}
 
-      <div className={`relative ${styles.content}`}>
-        {topRightSlot ? <div className="absolute right-2 top-2 z-10">{topRightSlot}</div> : null}
+      <div
+        className={`relative ${styles.content} ${useOverlayLink ? "pointer-events-none" : ""}`}
+      >
+        {topRightSlot ? (
+          <div className="pointer-events-auto absolute right-2 top-2 z-10">
+            {topRightSlot}
+          </div>
+        ) : null}
         <EventPoster imageUrl={imageUrl} imageAlt={imageAlt} aspectClassName={styles.posterAspect} />
 
         <div className={styles.body}>
@@ -82,7 +94,11 @@ export function EventCard({
             </p>
           </div>
 
-          {footer ? <div className={styles.footer}>{footer}</div> : null}
+          {footer ? (
+            <div className={`${styles.footer} ${useOverlayLink ? "pointer-events-auto" : ""}`}>
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </>
@@ -90,11 +106,11 @@ export function EventCard({
 
   if (href && hrefMode === "wrap") {
     return (
-      <Link href={href} aria-label={ariaLabel ?? title} className={styles.container}>
+      <Link href={href} aria-label={ariaLabel ?? title} className={cn(styles.container, className)} style={style}>
         {content}
       </Link>
     );
   }
 
-  return <div className={styles.container}>{content}</div>;
+  return <div className={cn(styles.container, className)} style={style}>{content}</div>;
 }

@@ -53,7 +53,7 @@ export function CalendarGrid({
   return (
     <div className="relative overflow-x-auto">
       <div className="min-w-[56rem]">
-        <div className="grid grid-cols-7 border-b border-border bg-panel-2">
+        <div className="office-content-reveal office-weekdays-reveal grid grid-cols-7 border-b border-border bg-panel-2">
           {weekdayLabels.map((label) => (
             <div
               key={label}
@@ -75,7 +75,13 @@ export function CalendarGrid({
             return (
               <div
                 key={day.key}
-                className={cn((index + 1) % 7 === 0 && "[&>div]:border-r-0")}
+                className={cn(
+                  "office-content-reveal office-day-reveal",
+                  (index + 1) % 7 === 0 && "[&>div]:border-r-0",
+                )}
+                style={{
+                  animationDelay: `${200 + Math.min(Math.floor(index / 7) * 35 + (index % 7) * 20, 240)}ms`,
+                }}
               >
                 <CalendarEventCell
                   dayNumber={day.dayNumber}

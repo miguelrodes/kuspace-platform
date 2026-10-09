@@ -52,8 +52,14 @@ export function DJNetworkPanel({ events }: DJNetworkPanelProps) {
         <p className="text-body-sm text-muted">No artists match this search.</p>
       ) : (
         <div className="max-h-[41rem] space-y-1 overflow-y-auto pr-2 text-sm text-muted">
-          {artists.map((artist) => (
-            <p key={artist}>{artist}</p>
+          {artists.map((artist, index) => (
+            <p
+              key={artist}
+              className="profile-content-reveal profile-artist-reveal"
+              style={{ animationDelay: `${400 + Math.min(index * 25, 200)}ms` }}
+            >
+              {artist}
+            </p>
           ))}
         </div>
       )}

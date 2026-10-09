@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import type { NextRequest, NextFetchEvent } from "next/server";
+import { sandboxBoundary } from "@/lib/demo/request-boundary";
+import { isPublicDemoMode } from "@/lib/demo-mode";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { isClerkConfigured } from "@/lib/auth/config";
 
@@ -16,7 +19,7 @@ const isProtectedRoute = createRouteMatcher([
   "/api/store/users(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
+const clerkProxy = clerkMiddleware(async (auth, request) => {
   if (!isClerkConfigured()) {
     return NextResponse.next();
   }
@@ -25,6 +28,10 @@ export default clerkMiddleware(async (auth, request) => {
     await auth.protect();
   }
 });
+
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  return sandboxBoundary(request, isPublicDemoMode()) ?? clerkProxy(request, event);
+}
 
 export const config = {
   matcher: [

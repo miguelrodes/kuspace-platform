@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { isLockedEventStatus } from "@/lib/event-status";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, DIALOG_ACTION_CLASS, DIALOG_FIELD_LABEL_CLASS, DIALOG_TITLE_CLASS } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { EditorSectionTitle } from "@/components/editor/editor-section-title";
 import { TicketSummaryPanel } from "@/components/editor/ticket-summary-panel";
 import { TicketTierCard, type TicketSectionDraft } from "@/components/editor/ticket-tier-card";
 import type { EventStatus, TicketReleaseMode, TicketSection, TicketSectionVisibility, TicketTier, TicketTierStatus } from "@/types/event";
-import type { AccessGroup } from "@/types/event";
+import type { AccessGroup, EventTicketsSection, TicketSalesHistory } from "@/types/event";
 
 export type TicketPhaseDraft = {
   id: string;
@@ -35,6 +36,7 @@ export type TicketSectionFormState = {
 export type TicketsFormState = {
   activeSectionId: string;
   sections: TicketSectionFormState[];
+  salesHistory?: TicketSalesHistory;
 };
 
 type TicketsTabProps = {
@@ -154,12 +156,13 @@ function normalizeAllowedGroupIds(
 
 export function buildInitialTicketsState(event: {
   status: EventStatus;
-  tickets: { tiers: TicketTier[]; sections?: TicketSection[] };
+  tickets: EventTicketsSection;
   guestlist: { accessGroups: AccessGroup[] };
 }): TicketsFormState {
   if (event.tickets.sections?.length) {
     return {
       activeSectionId: event.tickets.sections[0].id,
+      salesHistory: event.tickets.salesHistory,
       sections: event.tickets.sections.map((section) => {
         const visibility = normalizeSectionVisibility(section.visibility);
         const accessGroupId =
@@ -428,6 +431,7 @@ export function buildEventTicketsPatch(value: TicketsFormState, eventStatus: Eve
 
   return {
     tiers: flattenedTiers,
+    ...(value.salesHistory && eventStatus !== "draft" ? { salesHistory: value.salesHistory } : {}),
     sections: value.sections.map((section) => ({
       id: section.id,
       name: section.name,
@@ -459,8 +463,13 @@ export function buildEventTicketsPatch(value: TicketsFormState, eventStatus: Eve
   };
 }
 
-export function TicketsTab({ value, eventStatus, accessGroups, onChange }: TicketsTabProps) {
+export function TicketsTab({ value, eventStatus, accessGroups, onChange: onEditableChange }: TicketsTabProps) {
   const [view, setView] = useState<"sections" | "overview">("sections");
+  const [selectedSectionId, setSelectedSectionId] = useState(value.activeSectionId);
+  const readOnly = isLockedEventStatus(eventStatus);
+  const onChange = (nextState: TicketsFormState) => {
+    if (!readOnly) onEditableChange(nextState);
+  };
   const [sectionPendingDelete, setSectionPendingDelete] = useState<TicketSectionFormState | null>(null);
   const [showAddSectionDialog, setShowAddSectionDialog] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
@@ -468,18 +477,18 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
   const [newSectionAccessGroupId, setNewSectionAccessGroupId] = useState(accessGroups[0]?.id ?? "");
   const [newSectionAllowedGroupIds, setNewSectionAllowedGroupIds] = useState<string[]>([]);
   const activeSection = useMemo(
-    () => value.sections.find((section) => section.id === value.activeSectionId) ?? value.sections[0],
-    [value.activeSectionId, value.sections],
+    () => value.sections.find((section) => section.id === selectedSectionId) ?? value.sections[0],
+    [selectedSectionId, value.sections],
   );
 
   const activeSectionHasSales = activeSection
     ? activeSection.phases.some((phase) => parseNumber(phase.quantitySold) > 0)
     : false;
 
-  const canEditSectionMeta = eventStatus !== "past";
-  const canAddPhase = eventStatus !== "past";
+  const canEditSectionMeta = !readOnly;
+  const canAddPhase = !readOnly;
   const canDeleteSection =
-    eventStatus !== "past" &&
+    !readOnly &&
     value.sections.length > 1 &&
     !(eventStatus === "live" && activeSectionHasSales);
   const sectionOptions = useMemo(
@@ -498,8 +507,15 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
   return (
     <section className="w-full max-w-full min-w-0 overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel p-5">
       <div className="w-full max-w-full min-w-0 space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <EditorSectionTitle>Tickets</EditorSectionTitle>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <EditorSectionTitle>Tickets</EditorSectionTitle>
+            {readOnly ? (
+              <span className="text-body-sm text-[#facc15]">
+                Ticket section settings are read-only for this event status.
+              </span>
+            ) : null}
+          </div>
           <div className="-mr-3 ml-auto flex-1 text-right">
             <Button
               type="button"
@@ -513,7 +529,7 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
                 setNewSectionAllowedGroupIds([]);
                 setShowAddSectionDialog(true);
               }}
-              disabled={eventStatus === "past"}
+              disabled={readOnly}
             >
               Add Section
             </Button>
@@ -528,6 +544,7 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
                 view === "sections" ? "text-[#FFFFFF]" : "text-muted"
               }`}
               onClick={() => setView("sections")}
+              aria-pressed={view === "sections"}
             >
               Sections
             </button>
@@ -538,6 +555,7 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
                 view === "overview" ? "text-[#FFFFFF]" : "text-muted"
               }`}
               onClick={() => setView("overview")}
+              aria-pressed={view === "overview"}
             >
               Overview
             </button>
@@ -552,56 +570,57 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
                 labelClassName="block w-full text-right"
                 optionClassName={homeDropdownOptionClassName}
                 disabled={value.sections.length <= 1}
-                onChange={(sectionId) =>
-                  onChange({
-                    ...value,
-                    activeSectionId: sectionId,
-                  })
-                }
+                ariaLabel="Select ticket section"
+                onChange={setSelectedSectionId}
               />
             </div>
           ) : null}
         </div>
 
         {view === "sections" && activeSection ? (
-          <TicketTierCard
-            value={activeSection as TicketSectionDraft}
-            accessGroups={accessGroups}
-            editableSection={canEditSectionMeta}
-            canDeleteSection={canDeleteSection}
-            canAddPhase={canAddPhase}
-            onChange={(nextSection) =>
-              onChange({
-                ...value,
-                sections: value.sections.map((section) =>
-                  section.id === activeSection.id ? nextSection : section,
-                ),
-              })
-            }
-            onRemoveSection={() => {
-              if (!canDeleteSection) {
-                return;
+          <fieldset disabled={readOnly} className="min-w-0">
+            <TicketTierCard
+              value={activeSection as TicketSectionDraft}
+              accessGroups={accessGroups}
+              editableSection={canEditSectionMeta}
+              canDeleteSection={canDeleteSection}
+              canAddPhase={canAddPhase}
+              onChange={(nextSection) =>
+                onChange({
+                  ...value,
+                  sections: value.sections.map((section) =>
+                    section.id === activeSection.id ? nextSection : section,
+                  ),
+                })
               }
-              setSectionPendingDelete(activeSection);
-            }}
-            onAddPhase={(nextPhase) => {
-              onChange({
-                ...value,
-                sections: value.sections.map((section) =>
-                  section.id === activeSection.id
-                    ? {
-                        ...section,
-                        phases: [...section.phases, nextPhase],
-                      }
-                    : section,
-                ),
-              });
-            }}
-          />
+              onRemoveSection={() => {
+                if (!canDeleteSection) {
+                  return;
+                }
+                setSectionPendingDelete(activeSection);
+              }}
+              onAddPhase={(nextPhase) => {
+                onChange({
+                  ...value,
+                  sections: value.sections.map((section) =>
+                    section.id === activeSection.id
+                      ? {
+                          ...section,
+                          phases: [...section.phases, nextPhase],
+                        }
+                      : section,
+                  ),
+                });
+              }}
+            />
+          </fieldset>
         ) : null}
 
         {view === "overview" ? (
-          <TicketSummaryPanel sections={value.sections as TicketSectionDraft[]} />
+          <TicketSummaryPanel
+            sections={value.sections as TicketSectionDraft[]}
+            salesHistory={value.salesHistory}
+          />
         ) : null}
       </div>
 
@@ -619,6 +638,7 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
           onClose={() => setSectionPendingDelete(null)}
           onConfirm={() => {
             const remainingSections = value.sections.filter((section) => section.id !== sectionPendingDelete.id);
+            setSelectedSectionId(remainingSections[0]?.id ?? value.activeSectionId);
             onChange({
               activeSectionId: remainingSections[0]?.id ?? value.activeSectionId,
               sections: remainingSections,
@@ -680,6 +700,7 @@ export function TicketsTab({ value, eventStatus, accessGroups, onChange }: Ticke
               phases: newSectionVisibility === "restricted" ? [] : [createEmptyPhase()],
             };
 
+            setSelectedSectionId(nextSection.id);
             onChange({
               activeSectionId: nextSection.id,
               sections: [...value.sections, nextSection],

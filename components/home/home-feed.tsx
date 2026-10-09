@@ -71,48 +71,55 @@ export function HomeFeed({
       />
 
       {visibleEvents.length === 0 ? (
-        <div className="rounded-[var(--radius-surface)] border border-border bg-panel px-4 py-6">
+        <div
+          className="home-event-card-reveal rounded-[var(--radius-surface)] border border-border bg-panel px-4 py-6"
+        >
           <p className="text-body text-muted">
             No events match these filters.
           </p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {visibleEvents.map((event) => {
+          {visibleEvents.map((event, index) => {
             const eventRecruiter = recruiters.find((candidate) => candidate.id === event.recruiterProfileId);
             return (
-            <EventCard
+            <div
               key={event.id}
-              variant="large"
-              imageUrl={event.cover.imageUrl}
-              imageAlt={event.cover.imageAlt}
-              date={event.cover.date}
-              title={event.cover.title}
-              lineupPreview={event.lineup.entries.map((entry) => entry.name).join(", ")}
-              href={audience === "recruiter" ? `/rec/events/${event.slug}` : `/cons/events/${event.slug}`}
-              hrefMode={audience === "recruiter" ? "overlay" : "wrap"}
-              ariaLabel={`View ${event.cover.title}`}
-              footer={
-                <>
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-                    {event.cover.location || "Location"}
-                  </span>
-                  {audience === "recruiter" && eventRecruiter ? (
-                    <Link
-                      className="relative z-10 overflow-hidden text-ellipsis whitespace-nowrap underline-offset-2 hover:underline"
-                      href={`/recprofile/${eventRecruiter.slug}`}
-                      onClick={(clickEvent) => clickEvent.stopPropagation()}
-                    >
-                      {eventRecruiter.displayName}
-                    </Link>
-                  ) : (
+              className="home-event-card-reveal"
+              style={{ animationDelay: `${80 + Math.min(index * 65, 260)}ms` }}
+            >
+              <EventCard
+                variant="large"
+                imageUrl={event.cover.imageUrl}
+                imageAlt={event.cover.imageAlt}
+                date={event.cover.date}
+                title={event.cover.title}
+                lineupPreview={event.lineup.entries.map((entry) => entry.name).join(", ")}
+                href={audience === "recruiter" ? `/rec/events/${event.slug}` : `/cons/events/${event.slug}`}
+                hrefMode={audience === "recruiter" ? "overlay" : "wrap"}
+                ariaLabel={`View ${event.cover.title}`}
+                footer={
+                  <>
                     <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-                      {event.cover.venue || recruiter.displayName}
+                      {event.cover.location || "Location"}
                     </span>
-                  )}
-                </>
-              }
-            />
+                    {audience === "recruiter" && eventRecruiter ? (
+                      <Link
+                        className="relative z-10 overflow-hidden text-ellipsis whitespace-nowrap underline-offset-2 hover:underline"
+                        href={`/recprofile/${eventRecruiter.slug}`}
+                        onClick={(clickEvent) => clickEvent.stopPropagation()}
+                      >
+                        {eventRecruiter.displayName}
+                      </Link>
+                    ) : (
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                        {event.cover.venue || recruiter.displayName}
+                      </span>
+                    )}
+                  </>
+                }
+              />
+            </div>
             );
           })}
         </div>

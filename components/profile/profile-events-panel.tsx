@@ -33,7 +33,7 @@ export function ProfileEventsPanel({
     <div className="space-y-2.5 px-4 py-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2
-          className="relative top-[3px] text-heading uppercase leading-none"
+          className="relative top-[3px] text-heading-sm uppercase leading-none"
           style={{
             color: "var(--accent-hex)",
             fontFamily: "var(--font-space-grotesk)",
@@ -46,7 +46,7 @@ export function ProfileEventsPanel({
           {(["upcoming", "past"] as const).map((item, index) => (
             <div key={item} className="inline-flex items-end gap-2">
               {index > 0 ? (
-                <span className="relative top-[-2px] block text-lg uppercase tracking-widerish leading-none text-white">
+                <span className="relative top-[-2px] block text-sm uppercase tracking-widerish leading-none text-white">
                   |
                 </span>
               ) : null}
@@ -54,7 +54,7 @@ export function ProfileEventsPanel({
                 type="button"
                 onClick={() => setTab(item)}
                 className={[
-                  "inline-flex items-end rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-lg uppercase tracking-widerish leading-none transition",
+                  "inline-flex items-end rounded-[var(--radius-button-tag)] px-2.5 pb-0 pt-0 text-sm uppercase tracking-widerish leading-none transition",
                   tab === item
                     ? "bg-transparent text-white"
                     : "text-muted hover:text-fg",
@@ -72,9 +72,11 @@ export function ProfileEventsPanel({
       ) : (
         <div className="max-h-[32rem] overflow-y-auto pr-1">
           <div className={profileEventGridClassName}>
-            {visibleEvents.map((event) => (
+            {visibleEvents.map((event, index) => (
               <EventCard
                 key={event.id}
+                className="profile-content-reveal profile-card-reveal"
+                style={{ animationDelay: `${260 + Math.min(index * 65, 260)}ms` }}
                 variant="medium"
                 imageUrl={event.cover.imageUrl}
                 imageAlt={event.cover.imageAlt}

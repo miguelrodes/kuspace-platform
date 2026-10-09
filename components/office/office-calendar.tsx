@@ -95,7 +95,7 @@ export function OfficeCalendar({ events, closeSignal }: OfficeCalendarProps) {
   );
 
   return (
-    <section className="rounded-[var(--radius-surface)] border border-border bg-panel">
+    <div className="relative">
       <CalendarHeader
         month={visibleMonth}
         year={visibleYear}
@@ -109,17 +109,19 @@ export function OfficeCalendar({ events, closeSignal }: OfficeCalendarProps) {
           setActivePopover(null);
         }}
       />
-      <CalendarGrid
-        weekdayLabels={weekdayLabels}
-        days={days}
-        activeDayKey={
-          activePopover?.closeSignal === closeSignal
-            ? activePopover?.dayKey ?? null
-            : null
-        }
-        onDayOpen={(dayKey) => setActivePopover({ dayKey, closeSignal })}
-        onDayClose={() => setActivePopover(null)}
-      />
-    </section>
+      <section className="overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel">
+        <CalendarGrid
+          weekdayLabels={weekdayLabels}
+          days={days}
+          activeDayKey={
+            activePopover?.closeSignal === closeSignal
+              ? activePopover?.dayKey ?? null
+              : null
+          }
+          onDayOpen={(dayKey) => setActivePopover({ dayKey, closeSignal })}
+          onDayClose={() => setActivePopover(null)}
+        />
+      </section>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { isPublicDemoMode } from "@/lib/demo-mode";
+import { DemoEntry } from "@/components/demo/demo-entry";
 
 export default function HomePage() {
   const demoMode = isPublicDemoMode();
@@ -33,24 +34,26 @@ export default function HomePage() {
 
             <p className="mx-auto max-w-2xl text-body text-muted">
               {demoMode
-                ? "Explore the historical event demo or sign in with the supplied demonstration account to inspect the two recruiter workspaces."
+                ? "Explore both sides of KUSPACE: manage events through Space Ibiza's workspace or discover nights out as clubgoer Luca Dea. This portfolio demo combines historical event listings with fictional attendee, ticket and budget data. No account required. Your edits stay in your own demo session."
                 : "Enter as a consumer to discover events and manage tickets, or create an account with a role that matches how you want to use the platform."}
             </p>
 
             <div className="flex translate-y-[4px] flex-col items-center justify-center gap-1.5 pt-2">
+              {demoMode ? <DemoEntry /> : <>
               <a
-                href={demoMode ? "/rechome" : "/select-role?flow=signup"}
+                href="/select-role?flow=signup"
                 className="inline-flex h-11 min-w-[12rem] items-center justify-center rounded-[var(--radius-button-tag)] px-5 text-body uppercase tracking-[0.08em] transition hover:opacity-80"
                 style={{ color: "var(--accent-hex)" }}
               >
-                {demoMode ? "Explore Events" : "Create an Account"}
+                Create an Account
               </a>
               <a
                 href="/login"
                 className="inline-flex h-11 min-w-[12rem] items-center justify-center rounded-[var(--radius-button-tag)] px-5 text-body uppercase tracking-[0.08em] text-fg transition hover:opacity-80"
               >
-                {demoMode ? "Demo Sign In" : "Sign In"}
+                Sign In
               </a>
+              </>}
             </div>
           </div>
         </section>

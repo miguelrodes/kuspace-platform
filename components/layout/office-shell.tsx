@@ -42,15 +42,17 @@ export function OfficeShell({
                   </p>
                 ) : null}
                 <div className="space-y-1">
-                  <h1
-                    className={cn(
-                      "text-title font-semibold tracking-tightish",
-                      titleClassName,
-                    )}
-                    style={titleStyle}
-                  >
-                    {title}
-                  </h1>
+                  {title ? (
+                    <h1
+                      className={cn(
+                        "text-title font-semibold tracking-tightish",
+                        titleClassName,
+                      )}
+                      style={titleStyle}
+                    >
+                      {title}
+                    </h1>
+                  ) : null}
                   {description ? (
                     <p
                       className={cn(

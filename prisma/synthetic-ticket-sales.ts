@@ -8,13 +8,17 @@ export type SyntheticTicketSale = {
   quantity: number;
 };
 
-export function buildSyntheticTicketSales(event: Event, consumerCount: number): SyntheticTicketSale[] {
+export function buildSyntheticTicketSales(
+  event: Event,
+  consumerCount: number,
+  options: { preserveFixtureTotals?: boolean } = {},
+): SyntheticTicketSale[] {
   if (event.status === "draft" || event.status === "cancelled") {
     return [];
   }
 
   const sections = event.tickets.sections ?? [];
-  if (event.status === "upcoming") {
+  if (event.status === "upcoming" || options.preserveFixtureTotals) {
     const targets = sections.flatMap((section) => section.phases
       .filter((phase) => phase.price > 0 && (phase.quantitySold ?? 0) > 0)
       .map((phase) => ({ section, phase })));

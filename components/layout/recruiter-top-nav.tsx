@@ -9,6 +9,8 @@ import { resolveEventLabels } from "@/lib/event-labels";
 import { getPublicEventCollection } from "@/lib/event-status";
 import { cn } from "@/lib/utils/index";
 import { useAppStore } from "@/lib/app-store";
+import { isVisitorDemoSession } from "@/lib/demo/browser-session";
+import { useHeaderEntrance } from "@/components/layout/use-header-entrance";
 
 type RecruiterTopNavProps = {
   title?: string;
@@ -20,6 +22,7 @@ export function RecruiterTopNav({
   subtitle = "Clubs, Labels, Collectives",
 }: RecruiterTopNavProps) {
   const pathname = usePathname();
+  const headerRef = useHeaderEntrance(pathname, "/rechome");
   const router = useRouter();
   const {
     discoveryEvents,
@@ -37,7 +40,9 @@ export function RecruiterTopNav({
   const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null);
   const selectedOrganizationId =
     pendingOrganizationId ?? currentOrganizationId ?? "";
-
+  const viewedRecruiterSlug = pathname.startsWith("/recprofile/")
+    ? pathname.split("/")[2]
+    : null;
   const navItems = useMemo(
     () => [
       {
@@ -53,10 +58,12 @@ export function RecruiterTopNav({
       {
         href: profile.slug ? `/recprofile/${profile.slug}` : "/recprofile",
         label: "Profile",
-        active: pathname.startsWith("/recprofile"),
+        active:
+          pathname.startsWith("/recprofile") &&
+          (!viewedRecruiterSlug || viewedRecruiterSlug === profile.slug),
       },
     ],
-    [pathname, profile.slug],
+    [pathname, profile.slug, viewedRecruiterSlug],
   );
 
   const handleNavigate = (href: string) => {
@@ -117,48 +124,39 @@ export function RecruiterTopNav({
   );
 
   return (
-    <header className="border-b border-border bg-panel px-4 pb-2 pt-3 md:px-6">
-      <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-2 md:items-end">
+    <header ref={headerRef} className="site-header-divider bg-panel px-4 pb-4 pt-4 md:px-6 md:pb-3">
+      <div className="site-header-content mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-2 md:items-end">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/rechome" aria-label="Go to home">
+          <Link href="/" aria-label="Go to home">
             <img src="/favicon.ico" alt="" className="h-10 w-10 shrink-0" aria-hidden="true" />
           </Link>
           <div className="flex min-w-0 items-end gap-3">
-            <Link href="/rechome" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
+            <Link href="/" aria-label="Go to home" className="ml-1 shrink-0 transition hover:opacity-90">
               <img
                 src="/title-logo.svg"
                 alt="KUSPACE"
                 className="block h-10 w-auto translate-y-[3px]"
               />
             </Link>
-            {currentOrganization ? (
+            {currentOrganization && organizations.length > 1 && !isVisitorDemoSession() ? (
               <div className="min-w-0 space-y-0.5 pb-0.5">
-                <p className="truncate text-body-sm uppercase tracking-[0.12em] text-muted">
-                  Workspace
-                </p>
-                {organizations.length > 1 ? (
-                  <select
-                    value={selectedOrganizationId}
-                    onChange={(event) => void handleWorkspaceChange(event.target.value)}
-                    disabled={isSwitchingWorkspace}
-                    className="max-w-[14rem] border-0 bg-transparent p-0 text-body text-fg outline-none"
-                    aria-label="Switch workspace"
-                  >
-                    {organizations.map((membership) => (
-                      <option
-                        key={membership.organization.id}
-                        value={membership.organization.id}
-                        className="bg-panel text-fg"
-                      >
-                        {membership.organization.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="truncate text-body text-fg">
-                    {currentOrganization.name}
-                  </p>
-                )}
+                <select
+                  value={selectedOrganizationId}
+                  onChange={(event) => void handleWorkspaceChange(event.target.value)}
+                  disabled={isSwitchingWorkspace}
+                  className="max-w-[14rem] border-0 bg-transparent p-0 text-body text-fg outline-none"
+                  aria-label="Switch workspace"
+                >
+                  {organizations.map((membership) => (
+                    <option
+                      key={membership.organization.id}
+                      value={membership.organization.id}
+                      className="bg-panel text-fg"
+                    >
+                      {membership.organization.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : null}
           </div>
@@ -167,7 +165,7 @@ export function RecruiterTopNav({
         <div className="flex w-full flex-wrap items-center gap-3 pt-0 md:w-auto md:flex-nowrap md:gap-5 md:pt-1.5 md:pr-0">
           <nav
             aria-label="Recruiter navigation"
-            className="ml-5 flex items-center gap-7 text-subheading text-muted md:ml-4 md:gap-8"
+            className="ml-5 flex translate-y-[6px] items-center gap-7 text-base text-muted md:ml-4 md:gap-8"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             {navItems.map((item) => (
@@ -176,7 +174,7 @@ export function RecruiterTopNav({
                 href={item.href}
                 style={item.active ? { color: "#FFFFFF" } : undefined}
                 className={cn(
-                  "text-subheading uppercase tracking-widerish transition hover:text-fg",
+                  "text-base uppercase tracking-widerish transition hover:text-fg",
                   item.active ? "text-fg" : "text-muted",
                 )}
               >
@@ -185,7 +183,7 @@ export function RecruiterTopNav({
             ))}
           </nav>
 
-          <div className="relative ml-1 translate-y-[2px]">
+          <div className="relative ml-1 translate-y-[6px]">
             <button
               type="button"
               aria-label="Search events and artists"
@@ -195,7 +193,7 @@ export function RecruiterTopNav({
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
-                className="h-5 w-5"
+                className="h-5 w-5 translate-y-[2px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"

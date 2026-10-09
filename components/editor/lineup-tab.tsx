@@ -1,11 +1,11 @@
 "use client";
 
-import { KeyboardEvent, useMemo, useState } from "react";
+import { KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ArtistProfile, EventDisplayMode } from "@/types/event";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MetaTag } from "@/components/ui/meta-tag";
-import { DIALOG_ACTION_CLASS, DIALOG_FIELD_LABEL_CLASS, DIALOG_TITLE_CLASS } from "@/components/ui/action-dialog";
+import { DIALOG_ACTION_CLASS, DIALOG_TITLE_CLASS } from "@/components/ui/action-dialog";
 import { EditorSectionHeader } from "@/components/editor/editor-section-header";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 
@@ -19,6 +19,7 @@ export type LineupFormState = {
 
 type LineupTabProps = {
   value: LineupFormState;
+  readOnly?: boolean;
   availableArtists: ArtistProfile[];
   roomOptions: Array<{ id: string; name: string }>;
   onChange: (nextState: LineupFormState) => void;
@@ -60,33 +61,49 @@ function createArtistDraft(name: string): ArtistProfile {
 
 function ArtistModal({
   artist,
+  readOnly,
   onClose,
   onSave,
 }: {
   artist: ArtistProfile;
+  readOnly: boolean;
   onClose: () => void;
   onSave: (artist: ArtistProfile) => void;
 }) {
   const [draft, setDraft] = useState<ArtistProfile>(artist);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const fieldId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" onClick={onClose}>
-      <div
-        className="w-full max-w-xl rounded-[var(--radius-surface)] border border-border bg-panel p-5 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={`${fieldId}-title`}
+      className="m-auto max-h-[82dvh] w-[calc(100%-2rem)] max-w-md translate-y-[4vh] overflow-y-auto rounded-[var(--radius-surface)] border border-border bg-panel p-4 text-fg shadow-2xl backdrop:bg-black/45"
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-3">
-          <h3 className={`${DIALOG_TITLE_CLASS} text-[#FFFFFF]`}>
+          <h3 id={`${fieldId}-title`} className={`${DIALOG_TITLE_CLASS} text-[#FFFFFF]`}>
             Artist Details
           </h3>
         </div>
 
-        <div className="mt-4 space-y-4">
+        <fieldset disabled={readOnly} className="mt-3 min-w-0 space-y-3">
           <div>
-            <label className={DIALOG_FIELD_LABEL_CLASS}>
+            <label htmlFor={`${fieldId}-name`} className="text-body-xs uppercase tracking-widerish text-muted">
               Name
             </label>
             <Input
+              id={`${fieldId}-name`}
               value={draft.name}
               className="mt-1 text-body text-white/72"
               onChange={(event) =>
@@ -99,10 +116,11 @@ function ArtistModal({
           </div>
 
           <div>
-            <label className={DIALOG_FIELD_LABEL_CLASS}>
+            <label htmlFor={`${fieldId}-contact`} className="text-body-xs uppercase tracking-widerish text-muted">
               Contact
             </label>
             <Input
+              id={`${fieldId}-contact`}
               value={draft.contact ?? ""}
               placeholder="Optional"
               className="mt-1 text-body text-white/72"
@@ -116,10 +134,11 @@ function ArtistModal({
           </div>
 
           <div>
-            <label className={DIALOG_FIELD_LABEL_CLASS}>
+            <label htmlFor={`${fieldId}-instagram`} className="text-body-xs uppercase tracking-widerish text-muted">
               Instagram
             </label>
             <Input
+              id={`${fieldId}-instagram`}
               value={draft.instagram ?? ""}
               placeholder="Optional"
               className="mt-1 text-body text-white/72"
@@ -133,10 +152,11 @@ function ArtistModal({
           </div>
 
           <div>
-            <label className="text-body-lg uppercase tracking-widerish text-fg">
+            <label htmlFor={`${fieldId}-ra`} className="text-body-xs uppercase tracking-widerish text-muted">
               RA
             </label>
             <Input
+              id={`${fieldId}-ra`}
               value={draft.residentAdvisor ?? ""}
               placeholder="Optional"
               className="mt-1 text-body text-white/72"
@@ -150,10 +170,11 @@ function ArtistModal({
           </div>
 
           <div>
-            <label className="text-body-lg tracking-widerish text-fg">
+            <label htmlFor={`${fieldId}-website`} className="text-body-xs uppercase tracking-widerish text-muted">
               Website
             </label>
             <Input
+              id={`${fieldId}-website`}
               value={draft.website ?? ""}
               placeholder="Optional"
               className="mt-1 text-body text-white/72"
@@ -167,12 +188,13 @@ function ArtistModal({
           </div>
 
           <div>
-            <label className="text-body-lg tracking-widerish text-fg">
+            <label htmlFor={`${fieldId}-notes`} className="text-body-xs uppercase tracking-widerish text-muted">
               Notes
             </label>
             <textarea
+              id={`${fieldId}-notes`}
               value={draft.notes ?? ""}
-              rows={4}
+              rows={3}
               className="mt-1 w-full rounded-[var(--radius-surface)] border border-border bg-panel px-3 py-3 text-body text-white/72 outline-none placeholder:text-body-sm placeholder:text-muted focus:border-[var(--accent-hex)]"
               onChange={(event) =>
                 setDraft({
@@ -182,7 +204,7 @@ function ArtistModal({
               }
             />
           </div>
-        </div>
+        </fieldset>
 
         <div className="mt-5 flex justify-center">
           <Button
@@ -191,31 +213,39 @@ function ArtistModal({
             className={DIALOG_ACTION_CLASS}
             style={{ color: "var(--accent-hex)" }}
             onClick={() => {
+              if (readOnly) {
+                onClose();
+                return;
+              }
               onSave({
                 ...draft,
                 name: draft.name.trim(),
               });
             }}
           >
-            Done
+            {readOnly ? "Close" : "Done"}
           </Button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
 export function LineupTab({
   value,
+  readOnly = false,
   availableArtists,
   roomOptions,
-  onChange,
+  onChange: onEditableChange,
   onArtistsCatalogChange,
 }: LineupTabProps) {
   const [editingArtist, setEditingArtist] = useState<ArtistProfile | null>(null);
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null);
   const [roomManualInputs, setRoomManualInputs] = useState<Record<string, string>>({});
   const [roomLibraryQueries, setRoomLibraryQueries] = useState<Record<string, string>>({});
+  const onChange = (nextState: LineupFormState) => {
+    if (!readOnly) onEditableChange(nextState);
+  };
 
   const filteredArtists = useMemo(() => {
     const query = value.libraryQuery.trim().toLowerCase();
@@ -380,6 +410,7 @@ export function LineupTab({
               actions={
                 <div className="flex items-center gap-2">
                   <DropdownSelect
+                    disabled={readOnly}
                     value={value.displayMode}
                     options={[
                       { value: "event", label: "Event-wide" },
@@ -425,6 +456,7 @@ export function LineupTab({
                     </button>
                     <button
                       type="button"
+                      disabled={readOnly}
                       className="text-muted transition hover:text-fg"
                       onClick={() =>
                         onChange({
@@ -489,6 +521,7 @@ export function LineupTab({
                                   </button>
                                   <button
                                     type="button"
+                                    disabled={readOnly}
                                     className="text-muted transition hover:text-fg"
                                     onClick={() => removeArtistFromRoom(artist.id, room.id)}
                                   >
@@ -502,6 +535,7 @@ export function LineupTab({
 
                         <button
                           type="button"
+                          disabled={readOnly}
                           className="shrink-0 self-center text-body-sm uppercase tracking-widerish transition hover:opacity-80"
                           style={{ color: "var(--accent-hex)" }}
                           onClick={() =>
@@ -512,7 +546,7 @@ export function LineupTab({
                         </button>
                       </div>
 
-                      {isExpanded ? (
+                      {isExpanded && !readOnly ? (
                         <div className="space-y-3 pt-1">
                           <div>
                             <label className="text-body-sm uppercase tracking-widerish text-fg">
@@ -612,7 +646,7 @@ export function LineupTab({
 
           {value.displayMode === "event" ? (
             <>
-              <div className="pt-1">
+              <fieldset disabled={readOnly} className="min-w-0 pt-1">
                 <label className="text-body uppercase tracking-widerish text-fg">
                   Add Artist
                 </label>
@@ -638,7 +672,7 @@ export function LineupTab({
                     Add
                   </Button>
                 </div>
-              </div>
+              </fieldset>
 
               <div className="space-y-3 -mt-0.5">
                 <div>
@@ -646,6 +680,7 @@ export function LineupTab({
                     Previous Artists
                   </label>
                   <Input
+                    disabled={readOnly}
                     value={value.libraryQuery}
                     placeholder="Search artists already played"
                     className="mt-1 text-body text-white/72"
@@ -683,6 +718,7 @@ export function LineupTab({
                           </button>
                           <button
                             type="button"
+                            disabled={readOnly}
                             className="text-body-sm uppercase tracking-widerish transition hover:opacity-80"
                             style={{ color: "var(--accent-hex)" }}
                             onClick={(event) => {
@@ -706,8 +742,10 @@ export function LineupTab({
       {editingArtist ? (
         <ArtistModal
           artist={editingArtist}
+          readOnly={readOnly}
           onClose={() => setEditingArtist(null)}
           onSave={(nextArtist) => {
+            if (readOnly) return;
             onArtistsCatalogChange([nextArtist]);
             onChange({
               ...value,

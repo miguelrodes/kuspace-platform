@@ -6,7 +6,7 @@ export const profileEventGridClassName =
 export const eventCardVariants = {
   large: {
     container:
-      "group block h-full min-h-[17.5rem] overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2.5 transition hover:border-white/20",
+      "group relative block h-full min-h-[17.5rem] overflow-hidden rounded-[var(--radius-surface)] border border-border bg-panel px-2.5 py-2.5 transition hover:border-white/20",
     posterAspect: "aspect-[2.2/1]",
     content: "flex h-full flex-col gap-3",
     body: "flex flex-1 flex-col space-y-1.5",

@@ -26,7 +26,8 @@ export function OfficeEventTabs({
 }: OfficeEventTabsProps) {
   return (
     <SectionNav
-      className={className}
+      className={className ?? "[&>ul]:gap-3 xl:[&>ul]:gap-8"}
+      itemClassName="text-body"
       items={officeListTabs.map((tab) => officeListTabLabelMap[tab])}
       activeItem={officeListTabLabelMap[activeTab]}
       onChange={(item) => {

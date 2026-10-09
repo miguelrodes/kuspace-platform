@@ -2,6 +2,20 @@ import { LegalPage, LegalSection } from "@/components/demo/legal-page";
 
 const storage = [
   {
+    name: "kuspace_demo_sandbox",
+    provider: "KUSPACE / site domain",
+    purpose: "Routes one-click demo visitors to an isolated UI and blocks database APIs; not an authenticated identity",
+    lifetime: "Browser session; HttpOnly, SameSite=Lax, Secure on HTTPS",
+    category: "Requested demo functionality",
+  },
+  {
+    name: "kuspace_demo_session_v1 (sessionStorage)",
+    provider: "KUSPACE / current browser tab",
+    purpose: "Stores your demo role, workspace and local edits without sending those edits to the database",
+    lifetime: "Current tab session; Reset demo replaces the data and choosing another role starts fresh",
+    category: "Requested demo functionality",
+  },
+  {
     name: "__session",
     provider: "Clerk / KUSPACE site domain",
     purpose: "Short-lived signed-in session token used by Clerk and this app",
@@ -46,7 +60,7 @@ export default function CookiesPage() {
         </div>
       </LegalSection>
       <LegalSection title="Other browser storage and choices">
-        <p>The app code does not write to localStorage or sessionStorage. Clerk&apos;s SDK may use browser storage for its own authentication flow; its deployment-specific entries have not been independently inventoried. The app does not implement optional advertising or analytics storage, so there is no optional-cookie switch or accept/reject banner. The operator should review use of a Clerk development instance on a public site.</p>
+        <p>The one-click demo uses sessionStorage for edits isolated to your current tab. Reset demo restores the starting dataset. Choosing a role starts a fresh session; closing the tab normally clears its session storage, although browser session restoration may retain it. Clerk&apos;s SDK may use additional browser storage for its separate authentication flow. The app does not implement optional advertising or analytics storage.</p>
         <p>To end access to the shared demo, sign out using the account control. You can also clear this site&apos;s and Clerk&apos;s browser cookies and site storage in your browser settings. Blocking necessary cookies may prevent sign-in or workspace selection.</p>
       </LegalSection>
     </LegalPage>

@@ -622,6 +622,7 @@ function EventEditorScaffold({
     return (
       <LineupTab
         value={lineupValue}
+        readOnly={currentEventStatus === "past" || isLockedEventStatus(currentEventStatus)}
         availableArtists={availableArtists}
         roomOptions={coverValue.rooms}
         onChange={onLineupChange}
@@ -1052,9 +1053,7 @@ function BootstrappedEventEditorShell(props: EventEditorShellProps) {
 
   return (
     <div className="-mt-6 space-y-2">
-      <EventEditorHeader
-        attendeesHref={props.mode === "edit" ? `/office/events/${props.eventId}/attendees` : undefined}
-      />
+      <EventEditorHeader />
 
       <div className="pt-3">
         <div className="flex flex-wrap items-center gap-4">
@@ -1083,7 +1082,7 @@ function BootstrappedEventEditorShell(props: EventEditorShellProps) {
 
       <div className="min-w-0 max-w-full pt-1">
         <fieldset
-          disabled={isActiveTabDisabled}
+          disabled={isActiveTabDisabled && activeTab !== "lineup" && activeTab !== "tickets"}
           className={`min-w-0 max-w-full ${isActiveTabDisabled ? "opacity-85" : ""}`}
         >
           <EventEditorScaffold

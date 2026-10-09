@@ -42,7 +42,10 @@ export function CalendarHeader({
   }));
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+    <div
+      className="office-content-reveal office-calendar-controls-reveal flex flex-wrap items-center justify-end gap-6 pb-1 pl-4 pr-0 xl:absolute xl:right-0 xl:z-10"
+      style={{ top: "-2.25rem" }}
+    >
       <label className="inline-flex items-center gap-2 text-body-sm uppercase tracking-widerish text-muted">
         <span className="sr-only">Month</span>
         <DropdownSelect
@@ -50,8 +53,8 @@ export function CalendarHeader({
           value={String(month)}
           options={monthOptions}
           onChange={(value) => onMonthChange(Number(value))}
-          className="h-8 rounded-[var(--radius-surface)] border border-border bg-panel px-3 text-body text-fg outline-none transition focus:border-[var(--accent-hex)]"
-          optionClassName="text-body"
+          className="h-8 rounded-[var(--radius-surface)] px-3 pr-0 text-body-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-white/50"
+          optionClassName="text-body-sm"
         />
       </label>
 
@@ -62,8 +65,8 @@ export function CalendarHeader({
           value={String(year)}
           options={yearOptions}
           onChange={(value) => onYearChange(Number(value))}
-          className="h-8 rounded-[var(--radius-surface)] border border-border bg-panel px-3 text-body text-fg outline-none transition focus:border-[var(--accent-hex)]"
-          optionClassName="text-body"
+          className="h-8 rounded-[var(--radius-surface)] px-3 pr-0 text-body-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-white/50"
+          optionClassName="text-body-sm"
         />
       </label>
     </div>

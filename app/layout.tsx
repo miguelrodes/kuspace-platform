@@ -24,19 +24,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-public-demo={isPublicDemoMode() ? "true" : undefined}>
       <body suppressHydrationWarning className={spaceGrotesk.variable}>
         {isClerkConfigured() ? (
           <ClerkProvider>
-            {isPublicDemoMode() ? <DemoDisclosure /> : null}
             {children}
             <SiteFooter />
+            {isPublicDemoMode() ? <DemoDisclosure /> : null}
           </ClerkProvider>
         ) : (
           <>
-            {isPublicDemoMode() ? <DemoDisclosure /> : null}
             {children}
             <SiteFooter />
+            {isPublicDemoMode() ? <DemoDisclosure /> : null}
           </>
         )}
       </body>
